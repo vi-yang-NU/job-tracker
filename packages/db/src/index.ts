@@ -8,10 +8,16 @@ export { schema };
 let cachedClient: Client | undefined;
 let cachedDb: ReturnType<typeof drizzle<typeof schema>> | undefined;
 
+/**
+ * Returns a Drizzle DB instance. The libSQL client doesn't connect until a
+ * query runs, so building Next.js routes (which evaluate modules during
+ * `Collecting page data`) succeeds even when env vars aren't present yet.
+ * The actual missing-env error surfaces at request time, not build time.
+ */
 export function getDb(opts?: { url?: string; authToken?: string }) {
-  const url = opts?.url ?? process.env.TURSO_DATABASE_URL;
+  const url =
+    opts?.url ?? process.env.TURSO_DATABASE_URL ?? "libsql://unset.invalid";
   const authToken = opts?.authToken ?? process.env.TURSO_AUTH_TOKEN;
-  if (!url) throw new Error("TURSO_DATABASE_URL is not set");
   if (!cachedClient) {
     cachedClient = createClient({ url, authToken });
     cachedDb = drizzle(cachedClient, { schema });
