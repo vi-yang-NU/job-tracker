@@ -60,6 +60,12 @@ export async function getSetupStatus(): Promise<SetupStatus> {
     ok: env("TURSO_AUTH_TOKEN"),
     hint: "`turso db tokens create <db-name>`.",
   });
+  checks.push({
+    id: "repo_url",
+    label: "JOBTRACKER_REPO_URL",
+    ok: env("JOBTRACKER_REPO_URL"),
+    hint: "Public Git URL of this repo — required for the Mac-agent installer at /install.sh.",
+  });
 
   // Active DB ping — only if the URL/token both look set, to avoid noisy errors.
   if (

@@ -12,8 +12,9 @@ export async function GET(req: Request) {
   const repo = process.env.JOBTRACKER_REPO_URL;
   const branch = process.env.JOBTRACKER_REPO_BRANCH ?? "main";
   if (!repo) {
+    // Return 200 (not 500) so `curl -fsSL ... | bash` actually runs the script
+    // and prints the explanation. The script itself exits 1.
     return new NextResponse(misconfiguredScript(), {
-      status: 500,
       headers: {
         "content-type": "text/x-shellscript; charset=utf-8",
         "cache-control": "no-store",
