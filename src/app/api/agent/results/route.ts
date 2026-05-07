@@ -6,7 +6,6 @@ import {
   recordSimilar,
   emitNotification,
 } from "@/lib/persist";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 const resultSchema = z.object({
@@ -14,7 +13,6 @@ const resultSchema = z.object({
     z.object({
       url: z.string().url(),
       canonicalUrl: z.string().url(),
-      portfolioIds: z.array(z.string()),
       ok: z.boolean(),
       httpStatus: z.number().optional(),
       error: z.string().optional(),
@@ -61,8 +59,6 @@ export async function POST(req: Request) {
 
   for (const r of parsed.data.results) {
     if (!r.ok || !r.job) continue;
-    const portfolioIds = r.portfolioIds.length > 0 ? r.portfolioIds : [];
-    if (portfolioIds.length === 0) continue;
 
     const fetched = {
       ...r.job,
@@ -70,56 +66,43 @@ export async function POST(req: Request) {
       postedAt: r.job.postedAt ? new Date(r.job.postedAt) : undefined,
     };
 
-    for (const portfolioId of portfolioIds) {
-      const change = await upsertJobFromFetch(
-        { userId, portfolioId, url: r.url },
-        fetched,
-        r.httpStatus
-      );
+    const change = await upsertJobFromFetch(
+      { userId, url: r.url },
+      fetched,
+      r.httpStatus
+    );
 
-      // Re-read the job for the notification payload (title/company etc.)
-      const job = await db.query.jobs.findFirst({
-        where: (j, { eq }) => eq(j.id, change.jobId),
-      });
-      const summary = jobSummary(job);
+    const job = await db.query.jobs.findFirst({
+      where: (j, { eq }) => eq(j.id, change.jobId),
+    });
+    const summary = jobSummary(job);
 
-      // Transition events ------------------------------------------------
-      // Don't notify on the very first time we see a job — that's just adding it.
-      if (!change.isNew) {
-        if (change.priorAvailable === false && fetched.available) {
-          await emitNotification(userId, change.jobId, "job_opened", {
-            ...summary,
-            portfolioId,
-          });
-          eventsEmitted++;
-        }
-        if (change.priorAvailable === true && !fetched.available) {
-          await emitNotification(userId, change.jobId, "job_removed", {
-            ...summary,
-            portfolioId,
-          });
-          eventsEmitted++;
-        }
-        if (change.deadlineNewlySet && fetched.deadline) {
-          await emitNotification(userId, change.jobId, "deadline_set", {
-            ...summary,
-            deadline: fetched.deadline.toISOString(),
-            portfolioId,
-          });
-          eventsEmitted++;
-        }
+    if (!change.isNew) {
+      if (change.priorAvailable === false && fetched.available) {
+        await emitNotification(userId, change.jobId, "job_opened", summary);
+        eventsEmitted++;
       }
+      if (change.priorAvailable === true && !fetched.available) {
+        await emitNotification(userId, change.jobId, "job_removed", summary);
+        eventsEmitted++;
+      }
+      if (change.deadlineNewlySet && fetched.deadline) {
+        await emitNotification(userId, change.jobId, "deadline_set", {
+          ...summary,
+          deadline: fetched.deadline.toISOString(),
+        });
+        eventsEmitted++;
+      }
+    }
 
-      if (r.similar && r.similar.length > 0) {
-        const added = await recordSimilar(portfolioId, change.jobId, r.similar);
-        if (added > 0) {
-          await emitNotification(userId, change.jobId, "new_similar", {
-            count: added,
-            portfolioId,
-            sample: r.similar.slice(0, 3).map((s) => ({ title: s.title, url: s.url })),
-          });
-          eventsEmitted++;
-        }
+    if (r.similar && r.similar.length > 0) {
+      const added = await recordSimilar(userId, change.jobId, r.similar);
+      if (added > 0) {
+        await emitNotification(userId, change.jobId, "new_similar", {
+          count: added,
+          sample: r.similar.slice(0, 3).map((s) => ({ title: s.title, url: s.url })),
+        });
+        eventsEmitted++;
       }
     }
   }
@@ -137,6 +120,3 @@ function jobSummary(j: typeof schema.jobs.$inferSelect | undefined) {
     site: j.site,
   };
 }
-
-// silence unused import warning for `eq`
-void eq;

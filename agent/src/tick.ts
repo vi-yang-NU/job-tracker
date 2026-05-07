@@ -37,7 +37,6 @@ export async function tick() {
       results.push({
         url: job.url,
         canonicalUrl: job.canonicalUrl,
-        portfolioIds: job.portfolioIds,
         ok: false,
         error: (err as Error).message,
       });
@@ -83,7 +82,6 @@ function serialize(
   return {
     url: job.url,
     canonicalUrl: job.canonicalUrl,
-    portfolioIds: job.portfolioIds,
     ok: result.ok,
     httpStatus: result.httpStatus,
     error: result.error,

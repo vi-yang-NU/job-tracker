@@ -1,29 +1,22 @@
 import { db, schema } from "./db";
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { FetchedJob, SimilarPosting } from "@jobtracker/core";
 
 export interface UpsertContext {
   userId: string;
-  portfolioId: string;
   url: string;
 }
 
 export interface UpsertChange {
   jobId: string;
-  /** Was the job present in DB before this fetch? */
   isNew: boolean;
-  /** Availability of the job in the previous snapshot, if any. null = never fetched. */
+  /** Availability of the job in the previous snapshot. null = never fetched before. */
   priorAvailable: boolean | null;
-  /** Did this fetch first attach a deadline (none → some)? */
   deadlineNewlySet: boolean;
-  /** Snapshot of the row's status before this update. */
   priorStatus: string | null;
 }
 
-/**
- * Insert-or-update a job and record a snapshot. Returns the diff so callers
- * (the agent results endpoint) can emit notifications for state transitions.
- */
+/** Upsert a job by (user, canonical url) and append a snapshot. */
 export async function upsertJobFromFetch(
   ctx: UpsertContext,
   fetched: FetchedJob,
@@ -42,7 +35,6 @@ export async function upsertJobFromFetch(
 
   if (existing) {
     jobId = existing.id;
-    // Preserve user-managed states; only auto-flip active <-> removed.
     let nextStatus = existing.status;
     if (existing.status === "active" && !fetched.available) nextStatus = "removed";
     else if (existing.status === "removed" && fetched.available) nextStatus = "active";
@@ -88,11 +80,6 @@ export async function upsertJobFromFetch(
     jobId = inserted[0].id;
   }
 
-  await db
-    .insert(schema.portfolioJobs)
-    .values({ portfolioId: ctx.portfolioId, jobId })
-    .onConflictDoNothing();
-
   const priorAvailable = await priorAvailability(jobId);
 
   await db.insert(schema.snapshots).values({
@@ -106,13 +93,13 @@ export async function upsertJobFromFetch(
 }
 
 export async function recordSimilar(
-  portfolioId: string,
+  userId: string,
   sourceJobId: string | null,
   postings: SimilarPosting[]
 ) {
   if (postings.length === 0) return 0;
   const values = postings.map((p) => ({
-    portfolioId,
+    userId,
     sourceJobId,
     url: p.url,
     site: p.site,
@@ -125,7 +112,7 @@ export async function recordSimilar(
     .values(values)
     .onConflictDoNothing()
     .returning({ id: schema.similarJobs.id });
-  return result.length; // number actually inserted (excluding dupes)
+  return result.length;
 }
 
 export async function priorAvailability(jobId: string): Promise<boolean | null> {

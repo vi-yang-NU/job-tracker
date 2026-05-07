@@ -68,36 +68,6 @@ export const verificationTokens = sqliteTable(
 
 // App tables ----------------------------------------------------------------
 
-export const portfolios = sqliteTable(
-  "portfolios",
-  {
-    id: cuid(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    description: text("description"),
-    locationPrefs: text("location_prefs", { mode: "json" }).$type<{
-      cities?: string[];
-      remote?: boolean;
-      hybrid?: boolean;
-      maxRadiusKm?: number;
-      anchor?: { lat: number; lng: number; label: string };
-    }>(),
-    rolePrefs: text("role_prefs", { mode: "json" }).$type<{
-      titles?: string[];
-      seniority?: string[];
-      keywords?: string[];
-    }>(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-  },
-  (t) => ({
-    userIdx: index("portfolios_user_idx").on(t.userId),
-  })
-);
-
 export const jobs = sqliteTable(
   "jobs",
   {
@@ -153,25 +123,6 @@ export const jobs = sqliteTable(
   })
 );
 
-export const portfolioJobs = sqliteTable(
-  "portfolio_jobs",
-  {
-    portfolioId: text("portfolio_id")
-      .notNull()
-      .references(() => portfolios.id, { onDelete: "cascade" }),
-    jobId: text("job_id")
-      .notNull()
-      .references(() => jobs.id, { onDelete: "cascade" }),
-    addedAt: integer("added_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-  },
-  (t) => ({
-    pk: primaryKey({ columns: [t.portfolioId, t.jobId] }),
-    jobIdx: index("portfolio_jobs_job_idx").on(t.jobId),
-  })
-);
-
 export const snapshots = sqliteTable(
   "snapshots",
   {
@@ -196,9 +147,9 @@ export const similarJobs = sqliteTable(
   "similar_jobs",
   {
     id: cuid(),
-    portfolioId: text("portfolio_id")
+    userId: text("user_id")
       .notNull()
-      .references(() => portfolios.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     sourceJobId: text("source_job_id").references(() => jobs.id, {
       onDelete: "set null",
     }),
@@ -216,11 +167,8 @@ export const similarJobs = sqliteTable(
     }),
   },
   (t) => ({
-    portfolioIdx: index("similar_jobs_portfolio_idx").on(t.portfolioId),
-    urlIdx: uniqueIndex("similar_jobs_portfolio_url_idx").on(
-      t.portfolioId,
-      t.url
-    ),
+    userIdx: index("similar_jobs_user_idx").on(t.userId),
+    urlIdx: uniqueIndex("similar_jobs_user_url_idx").on(t.userId, t.url),
   })
 );
 
@@ -276,7 +224,6 @@ export const notifications = sqliteTable(
 );
 
 export type User = typeof users.$inferSelect;
-export type Portfolio = typeof portfolios.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
 export type Snapshot = typeof snapshots.$inferSelect;
 export type SimilarJob = typeof similarJobs.$inferSelect;

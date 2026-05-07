@@ -6,7 +6,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Job Tracker",
-  description: "Track jobs, deadlines, and similar postings — across portfolios.",
+  description: "Paste job links, watch for changes, get pinged when something happens.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

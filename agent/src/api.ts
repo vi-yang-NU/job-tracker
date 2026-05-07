@@ -7,7 +7,6 @@ export interface RemoteJob {
   site: string;
   status: string;
   lastFetchedAt: string | null;
-  portfolioIds: string[];
 }
 
 export interface InboxItem {

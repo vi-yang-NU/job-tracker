@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
-import { and, eq, ne, or, isNull, lt } from "drizzle-orm";
+import { and, ne, or, isNull, lt } from "drizzle-orm";
 import { fetchJob, fetchSimilar } from "@jobtracker/core";
 import { upsertJobFromFetch, recordSimilar, emitNotification } from "@/lib/persist";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Vercel Cron handler. Runs every 3h (configured in vercel.json).
- * Iterates over jobs whose adapter does NOT need a browser and refreshes them.
+ * Iterates over every job whose adapter does NOT need a browser and refreshes it.
  * Browser-only jobs (LinkedIn, Workday) are left to the per-user Mac agent.
  */
 export async function GET(req: Request) {
@@ -18,12 +18,8 @@ export async function GET(req: Request) {
   const cutoff = new Date(Date.now() - 2.5 * 3600_000);
 
   const candidates = await db
-    .select({
-      job: schema.jobs,
-      portfolioId: schema.portfolioJobs.portfolioId,
-    })
+    .select()
     .from(schema.jobs)
-    .innerJoin(schema.portfolioJobs, eq(schema.portfolioJobs.jobId, schema.jobs.id))
     .where(
       and(
         ne(schema.jobs.status, "withdrawn"),
@@ -34,14 +30,14 @@ export async function GET(req: Request) {
 
   const results: Array<{ jobId: string; ok: boolean; error?: string }> = [];
 
-  for (const { job, portfolioId } of candidates) {
+  for (const job of candidates) {
     const result = await fetchJob(job.canonicalUrl, { staticOnly: true });
     if (!result.ok || !result.job) {
       results.push({ jobId: job.id, ok: false, error: result.error });
       continue;
     }
     const change = await upsertJobFromFetch(
-      { userId: job.userId, portfolioId, url: job.url },
+      { userId: job.userId, url: job.url },
       result.job,
       result.httpStatus
     );
@@ -53,7 +49,6 @@ export async function GET(req: Request) {
           company: fjob.company,
           url: job.url,
           site: fjob.site,
-          portfolioId,
         });
       }
       if (change.priorAvailable === true && !fjob.available) {
@@ -62,7 +57,6 @@ export async function GET(req: Request) {
           company: fjob.company,
           url: job.url,
           site: fjob.site,
-          portfolioId,
         });
       }
       if (change.deadlineNewlySet && fjob.deadline) {
@@ -71,17 +65,15 @@ export async function GET(req: Request) {
           company: fjob.company,
           url: job.url,
           deadline: fjob.deadline.toISOString(),
-          portfolioId,
         });
       }
     }
     const sims = await fetchSimilar(job.canonicalUrl, { staticOnly: true });
     if (sims.length > 0) {
-      const added = await recordSimilar(portfolioId, job.id, sims);
+      const added = await recordSimilar(job.userId, job.id, sims);
       if (added > 0) {
         await emitNotification(job.userId, job.id, "new_similar", {
           count: added,
-          portfolioId,
           sample: sims.slice(0, 3).map((s) => ({ title: s.title, url: s.url })),
         });
       }
@@ -94,7 +86,7 @@ export async function GET(req: Request) {
 
 function authorized(req: Request): boolean {
   const expected = process.env.CRON_SECRET;
-  if (!expected) return true; // Allow local dev when not configured
+  if (!expected) return true;
   const auth = req.headers.get("authorization");
   return auth === `Bearer ${expected}`;
 }
