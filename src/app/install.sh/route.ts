@@ -99,7 +99,7 @@ done
 # Ollama powers the resume + eligibility analysis (all local, your text never
 # leaves the machine). The installer ensures the daemon is running and the
 # generation + embedding models are pulled before we hand off to launchd.
-GEN_MODEL="\${OLLAMA_MODEL:-llama3.1:8b}"
+GEN_MODEL="\${OLLAMA_MODEL:-llama3.2:3b}"
 EMBED_MODEL="\${OLLAMA_EMBED_MODEL:-nomic-embed-text}"
 
 ensure_ollama_ready() {
@@ -208,7 +208,7 @@ fi
   fi
   echo "# Ollama settings (defaults assume \\\`brew install ollama\\\` is running locally)"
   echo "# OLLAMA_BASE=http://localhost:11434"
-  echo "# OLLAMA_MODEL=llama3.1:8b              # generation"
+  echo "# OLLAMA_MODEL=llama3.2:3b              # generation (default ~2GB)"
   echo "# OLLAMA_EMBED_MODEL=nomic-embed-text   # embeddings (RAG)"
 } > "$INSTALL_DIR/agent/.env"
 

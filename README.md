@@ -91,7 +91,7 @@ brew install ollama
 brew services start ollama         # runs on boot
 
 # generation model — extracts structure, verifies skills
-ollama pull llama3.1:8b            # ~4.7GB
+ollama pull llama3.2:3b            # ~2GB (small + Mac-friendly)
 
 # embedding model — needed for RAG-grounded skill matching
 ollama pull nomic-embed-text       # ~270MB

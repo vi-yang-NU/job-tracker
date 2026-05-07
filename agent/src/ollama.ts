@@ -2,10 +2,12 @@
  * Tiny client for the local Ollama server (http://localhost:11434).
  *
  * We call /api/chat with `format: "json"` so the model returns parseable JSON.
- * The model is configurable via OLLAMA_MODEL (default llama3.1:8b).
+ * The model is configurable via OLLAMA_MODEL (default llama3.2:3b — small
+ * enough to stay well under typical Mac memory pressure while still producing
+ * reliable JSON via format: "json").
  */
 const BASE = process.env.OLLAMA_BASE ?? "http://localhost:11434";
-const MODEL = process.env.OLLAMA_MODEL ?? "llama3.1:8b";
+const MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:3b";
 
 export interface OllamaInfo {
   available: boolean;
