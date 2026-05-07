@@ -30,42 +30,93 @@ export default async function Home() {
         <li>
           — Optional Mac agent — runs every 3 hours and sends an iMessage when something
           actually changes.{" "}
-          <Link
+          <a
             href="#agent"
             className="font-medium text-accent underline-offset-2 transition-colors duration-150 hover:underline"
           >
-            Set it up
-          </Link>
+            Set it up ↓
+          </a>
         </li>
       </ul>
 
-      <div className="animate-rise-delay-2 mt-8">
+      <div className="animate-rise-delay-2 mt-8 flex flex-wrap gap-3">
         <Link href="/login" className="btn-primary group px-5 py-2.5 text-base">
           Sign in with Google
           <span className="ml-1 inline-block transition-transform duration-150 group-hover:translate-x-0.5">
             →
           </span>
         </Link>
+        <a
+          href="#agent"
+          className="btn-ghost px-5 py-2.5 text-base"
+        >
+          Set up Mac agent
+        </a>
       </div>
 
       <section
         id="agent"
-        className="card-hover mt-16 rounded-lg border border-black/10 bg-white p-6"
+        className="card-hover relative mt-16 scroll-mt-24 overflow-hidden rounded-lg border border-black/10 bg-white p-6"
       >
-        <h2 className="text-xl font-semibold">Optional: install the Mac agent</h2>
-        <p className="mt-1 text-sm text-black/60">
-          Sign in first, then mint a token at <code>/agent</code>. After that, run this on your
-          Mac:
-        </p>
-        <pre className="mt-3 overflow-x-auto rounded bg-black/90 p-3 text-xs text-white">
+        <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-accent/10 blur-2xl" />
+        <div className="relative">
+          <h2 className="text-xl font-semibold">Optional: install the Mac agent</h2>
+          <p className="mt-1 text-sm text-black/60">
+            Three steps. Skip if you only need the dashboard view.
+          </p>
+
+          <ol className="mt-4 space-y-3 text-sm text-black/80">
+            <Step n={1} title="Sign in">
+              <Link
+                href="/login"
+                className="text-accent underline-offset-2 hover:underline"
+              >
+                Sign in with Google
+              </Link>{" "}
+              if you haven't already.
+            </Step>
+            <Step n={2} title="Mint an agent token">
+              From the dashboard, go to{" "}
+              <Link href="/agent" className="text-accent underline-offset-2 hover:underline">
+                <code>/agent</code>
+              </Link>{" "}
+              and click <strong>+ Create token</strong>. Copy the token (shown once).
+            </Step>
+            <Step n={3} title="Install on your Mac">
+              <pre className="mt-1 overflow-x-auto rounded bg-black/90 p-3 text-xs text-white">
 {`curl -fsSL ${process.env.NEXTAUTH_URL ?? "<your-deployment>"}/install.sh | bash`}
-        </pre>
-        <p className="mt-2 text-xs text-black/50">
-          The agent runs at login + every 3 hours and stays silent unless something has changed.
-          Skip this if you only need the dashboard view.
-        </p>
+              </pre>
+              <p className="mt-1 text-xs text-black/50">
+                Paste the token when prompted. Runs at login + every 3 hours, silent unless
+                something has changed.
+              </p>
+            </Step>
+          </ol>
+        </div>
       </section>
     </div>
+  );
+}
+
+function Step({
+  n,
+  title,
+  children,
+}: {
+  n: number;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <li className="flex gap-3">
+      <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
+        {n}
+      </span>
+      <div className="flex-1">
+        <div className="font-medium">{title}</div>
+        <div className="mt-0.5 text-black/70">{children}</div>
+      </div>
+    </li>
   );
 }
 
