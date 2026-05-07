@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.vercel
+.turbo
+coverage/
+playwright-report/
+.cache/
+agent/local.db
+agent/.token

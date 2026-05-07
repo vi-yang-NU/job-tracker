@@ -1,0 +1,20 @@
+{
+  "name": "job-tracker",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "web",
+    "agent",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace web",
+    "dev:agent": "npm run dev --workspace agent",
+    "build:web": "npm run build --workspace web",
+    "build:agent": "npm run build --workspace agent",
+    "db:push": "npm run db:push --workspace @jobtracker/db"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

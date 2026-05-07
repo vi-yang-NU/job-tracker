@@ -1,0 +1,25 @@
+{
+  "name": "@jobtracker/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "jobtracker": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "tick": "node dist/index.js tick",
+    "digest": "node dist/index.js digest"
+  },
+  "dependencies": {
+    "@jobtracker/core": "*",
+    "dotenv": "^16.4.5",
+    "playwright": "^1.49.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.9.0"
+  }
+}
