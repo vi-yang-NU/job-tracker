@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { and, eq, ne, or, isNull, lt } from "drizzle-orm";
 import { fetchJob, fetchSimilar } from "@jobtracker/core";
-import { upsertJobFromFetch, recordSimilar, priorAvailability } from "@/lib/persist";
+import { upsertJobFromFetch, recordSimilar, emitNotification } from "@/lib/persist";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -40,17 +40,52 @@ export async function GET(req: Request) {
       results.push({ jobId: job.id, ok: false, error: result.error });
       continue;
     }
-    const wasAvailable = await priorAvailability(job.id);
-    await upsertJobFromFetch(
+    const change = await upsertJobFromFetch(
       { userId: job.userId, portfolioId, url: job.url },
       result.job,
       result.httpStatus
     );
-    if (wasAvailable === true && !result.job.available) {
-      // For "removed" we leave notification dispatch to the digest cron / agent
+    if (!change.isNew) {
+      const fjob = result.job;
+      if (change.priorAvailable === false && fjob.available) {
+        await emitNotification(job.userId, change.jobId, "job_opened", {
+          title: fjob.title,
+          company: fjob.company,
+          url: job.url,
+          site: fjob.site,
+          portfolioId,
+        });
+      }
+      if (change.priorAvailable === true && !fjob.available) {
+        await emitNotification(job.userId, change.jobId, "job_removed", {
+          title: fjob.title,
+          company: fjob.company,
+          url: job.url,
+          site: fjob.site,
+          portfolioId,
+        });
+      }
+      if (change.deadlineNewlySet && fjob.deadline) {
+        await emitNotification(job.userId, change.jobId, "deadline_set", {
+          title: fjob.title,
+          company: fjob.company,
+          url: job.url,
+          deadline: fjob.deadline.toISOString(),
+          portfolioId,
+        });
+      }
     }
     const sims = await fetchSimilar(job.canonicalUrl, { staticOnly: true });
-    if (sims.length > 0) await recordSimilar(portfolioId, job.id, sims);
+    if (sims.length > 0) {
+      const added = await recordSimilar(portfolioId, job.id, sims);
+      if (added > 0) {
+        await emitNotification(job.userId, job.id, "new_similar", {
+          count: added,
+          portfolioId,
+          sample: sims.slice(0, 3).map((s) => ({ title: s.title, url: s.url })),
+        });
+      }
+    }
     results.push({ jobId: job.id, ok: true });
   }
 

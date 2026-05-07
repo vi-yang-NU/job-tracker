@@ -118,8 +118,22 @@ export const jobs = sqliteTable(
     salaryMax: integer("salary_max"),
     deadline: integer("deadline", { mode: "timestamp_ms" }),
     postedAt: integer("posted_at", { mode: "timestamp_ms" }),
+    /**
+     * When the user expects to apply (e.g., a 2027 cohort). Nullable.
+     * Used to keep "watching" jobs around indefinitely without cluttering
+     * the active list.
+     */
+    targetApplyDate: integer("target_apply_date", { mode: "timestamp_ms" }),
     status: text("status", {
-      enum: ["active", "removed", "applied", "rejected", "offered", "withdrawn"],
+      enum: [
+        "active",
+        "watching",
+        "removed",
+        "applied",
+        "rejected",
+        "offered",
+        "withdrawn",
+      ],
     })
       .notNull()
       .default("active"),
@@ -241,6 +255,8 @@ export const notifications = sqliteTable(
     kind: text("kind", {
       enum: [
         "deadline_soon",
+        "deadline_set",
+        "job_opened",
         "job_removed",
         "new_similar",
         "fetch_failed",

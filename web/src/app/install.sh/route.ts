@@ -1,11 +1,25 @@
 import { NextResponse } from "next/server";
 
-/** Public installer served at https://your-app/install.sh */
+/**
+ * Public installer served at https://your-deployment/install.sh
+ *
+ * Operators must set JOBTRACKER_REPO_URL in their Vercel env to point at the
+ * repo end-users should clone. We intentionally have no default — it would
+ * tie the script to whoever first wrote it.
+ */
 export async function GET(req: Request) {
   const origin = new URL(req.url).origin;
-  const repo =
-    process.env.JOBTRACKER_REPO_URL ?? "https://github.com/Vincent-Yang0134/job-tracker.git";
+  const repo = process.env.JOBTRACKER_REPO_URL;
   const branch = process.env.JOBTRACKER_REPO_BRANCH ?? "main";
+  if (!repo) {
+    return new NextResponse(misconfiguredScript(), {
+      status: 500,
+      headers: {
+        "content-type": "text/x-shellscript; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    });
+  }
   const script = renderInstaller(origin, repo, branch);
   return new NextResponse(script, {
     headers: {
@@ -15,6 +29,14 @@ export async function GET(req: Request) {
   });
 }
 
+function misconfiguredScript() {
+  return `#!/usr/bin/env bash
+echo "jobtracker: this deployment is missing JOBTRACKER_REPO_URL." >&2
+echo "  The site operator must set this env var to the public Git URL of the agent source." >&2
+exit 1
+`;
+}
+
 function renderInstaller(origin: string, repo: string, branch: string) {
   return `#!/usr/bin/env bash
 set -euo pipefail
@@ -22,7 +44,7 @@ set -euo pipefail
 API_BASE="${origin}"
 REPO="${repo}"
 BRANCH="${branch}"
-INSTALL_DIR="$HOME/.jobtracker"
+INSTALL_DIR="\${JOBTRACKER_HOME:-$HOME/.jobtracker}"
 PLIST="$HOME/Library/LaunchAgents/com.jobtracker.agent.plist"
 
 echo "Installing jobtracker agent to $INSTALL_DIR"
@@ -34,7 +56,6 @@ for cmd in node npm git; do
   fi
 done
 
-# Fetch the agent source (sparse — only the bits we need)
 if [ -d "$INSTALL_DIR/.git" ]; then
   git -C "$INSTALL_DIR" fetch origin "$BRANCH"
   git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH"
@@ -50,26 +71,34 @@ npm install --silent
 echo "Building agent..."
 npm run build:agent --silent
 
-# Token
 if [ ! -f "$INSTALL_DIR/agent/.token" ]; then
-  printf "Paste your agent token (from $API_BASE/agent): "
-  read -r TOKEN
-  echo "$TOKEN" > "$INSTALL_DIR/agent/.token"
-  chmod 600 "$INSTALL_DIR/agent/.token"
+  if [ -t 0 ]; then
+    printf "Paste your agent token (from $API_BASE/agent): "
+    read -r TOKEN
+    echo "$TOKEN" > "$INSTALL_DIR/agent/.token"
+    chmod 600 "$INSTALL_DIR/agent/.token"
+  else
+    echo ""
+    echo "No token file at $INSTALL_DIR/agent/.token and no TTY to prompt." >&2
+    echo "Either pipe a token in (echo TOKEN | $0) or rerun in a terminal." >&2
+    exit 1
+  fi
 fi
 
-# Config
 cat > "$INSTALL_DIR/agent/.env" <<EOF
 JOBTRACKER_API=$API_BASE
 JOBTRACKER_TOKEN_FILE=$INSTALL_DIR/agent/.token
+# Optional: set this to your phone number / Apple ID to receive iMessages.
+# JOBTRACKER_IMESSAGE_TO=+15555550123
 EOF
 
-# Install Playwright browser (Chromium) — needed for LinkedIn / Workday
-npx --prefix "$INSTALL_DIR/agent" playwright install chromium --with-deps >/dev/null 2>&1 || \
-  npx --prefix "$INSTALL_DIR/agent" playwright install chromium >/dev/null 2>&1 || true
+# Install Playwright browser (Chromium) for sites that need a real browser.
+( cd "$INSTALL_DIR/agent" && npx playwright install chromium >/dev/null 2>&1 ) || true
 
-# launchd plist
+# launchd plist (every 3h + at login). macOS coalesces missed StartInterval
+# firings while the laptop is asleep into a single RunAtLoad run on next wake.
 mkdir -p "$HOME/Library/LaunchAgents"
+NODE_BIN="$(command -v node)"
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -78,7 +107,7 @@ cat > "$PLIST" <<EOF
   <key>Label</key><string>com.jobtracker.agent</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$(command -v node)</string>
+    <string>$NODE_BIN</string>
     <string>$INSTALL_DIR/agent/dist/index.js</string>
     <string>tick</string>
   </array>
@@ -100,7 +129,7 @@ launchctl load "$PLIST"
 launchctl start com.jobtracker.agent || true
 
 echo ""
-echo "✓ Installed. Agent runs at login + every 3 hours."
+echo "✓ Installed. Agent runs at login and every 3 hours while the laptop is awake."
 echo "  Logs:        $INSTALL_DIR/agent.log"
 echo "  Run now:     launchctl start com.jobtracker.agent"
 echo "  Stop:        launchctl unload $PLIST"

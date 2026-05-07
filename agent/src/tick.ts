@@ -1,15 +1,14 @@
 import { Api, type RemoteJob } from "./api";
 import { fetchJob, fetchSimilar, detectAdapter } from "@jobtracker/core";
 import { fetchHtmlWithBrowser, shutdownBrowser } from "./browser";
-import { formatDigest, shortSummary } from "./digest";
+import { formatInbox } from "./digest";
 import { iMessage, macNotify } from "./notify";
 import { loadConfig } from "./config";
 
-const DIGEST_FLAG_HOURS = 22; // send at most one digest per ~day
-
-export async function tick(opts: { sendDigest?: boolean; iMessageTo?: string } = {}) {
+export async function tick() {
   const cfg = loadConfig();
   const api = new Api(cfg);
+  const iMessageTo = process.env.JOBTRACKER_IMESSAGE_TO;
 
   const me = await api.me();
   console.log(`[tick] signed in as ${me.email}`);
@@ -47,16 +46,33 @@ export async function tick(opts: { sendDigest?: boolean; iMessageTo?: string } =
 
   if (results.length > 0) {
     const ack = await api.postResults(results);
-    console.log(`[tick] posted ${results.length} results, ${ack.events.length} events`);
+    console.log(`[tick] posted ${results.length} results, ${ack.eventsEmitted} events emitted`);
   }
 
   await shutdownBrowser();
 
-  // Digest: once per day in the morning, or when the user asked explicitly.
-  const should = opts.sendDigest ?? shouldSendDigest();
-  if (should) {
-    await sendDigest(api, opts.iMessageTo);
+  // Drain the inbox: only deliver if there's something new since last tick.
+  const inbox = await api.inbox();
+  if (inbox.notifications.length === 0) {
+    console.log("[tick] inbox empty — staying silent");
+    return;
   }
+
+  const formatted = formatInbox(inbox.notifications);
+  if (!formatted) return;
+
+  console.log(`[tick] delivering ${inbox.notifications.length} notifications`);
+  await macNotify(formatted.short.title, formatted.short.body);
+  let via: "macos_notification" | "imessage" = "macos_notification";
+  if (iMessageTo) {
+    const ok = await iMessage(formatted.full, iMessageTo);
+    if (ok) via = "imessage";
+    console.log(`[tick] iMessage to ${iMessageTo}: ${ok ? "sent" : "failed"}`);
+  }
+  await api.ackInbox(
+    inbox.notifications.map((n) => n.id),
+    via
+  );
 }
 
 function serialize(
@@ -80,28 +96,4 @@ function serialize(
       : undefined,
     similar,
   };
-}
-
-let lastDigestAt: number | undefined;
-function shouldSendDigest(): boolean {
-  const now = new Date();
-  const hour = now.getHours();
-  if (hour < 7 || hour > 11) return false; // 7-11am window
-  if (lastDigestAt && Date.now() - lastDigestAt < DIGEST_FLAG_HOURS * 3600_000) return false;
-  lastDigestAt = Date.now();
-  return true;
-}
-
-export async function sendDigest(api: Api, iMessageTo?: string) {
-  const d = await api.digest();
-  const summary = shortSummary(d);
-  if (!summary) {
-    console.log("[digest] nothing to report");
-    return;
-  }
-  await macNotify(summary.title, summary.body);
-  if (iMessageTo) {
-    const ok = await iMessage(formatDigest(d), iMessageTo);
-    console.log(`[digest] iMessage to ${iMessageTo}: ${ok ? "sent" : "failed"}`);
-  }
 }

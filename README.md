@@ -1,52 +1,69 @@
 # job-tracker
 
-A multi-tenant job tracker. Hosted dashboard on Vercel; an optional Mac agent runs locally and sends you an iMessage / macOS notification every morning.
+A multi-tenant job tracker. Hosted dashboard on Vercel; an optional Mac agent runs locally and sends you iMessage / macOS notifications **only when something has actually changed**.
 
 ```
 ┌──────────────────────────┐         ┌──────────────────────────┐
 │ web/  (Next.js, Vercel)  │ ◄─────► │ Turso (libSQL)           │
 │  • Google sign-in         │         │  users / portfolios /    │
 │  • Portfolios + map UI    │         │  jobs / snapshots /      │
-│  • Adds jobs via static   │         │  similar_jobs / tokens   │
-│    fetch (Greenhouse,     │         └──────────┬───────────────┘
-│    Lever, Ashby)          │                    │
-│  • Vercel Cron every 3h   │                    │
-└────────────┬──────────────┘                    │
+│  • Status incl. "watching"│         │  similar_jobs / tokens   │
+│  • Vercel Cron every 3h   │         │  notifications (inbox)   │
+└────────────┬──────────────┘         └──────────┬───────────────┘
              │ REST + bearer token               │
              ▼                                   ▼
      ┌────────────────────────────────────────────────┐
      │ agent/  (Mac CLI, runs via launchd every 3h)   │
      │  • Pulls user's tracked URLs                   │
      │  • Playwright for LinkedIn / Workday           │
-     │  • Posts results back                          │
-     │  • Morning digest → iMessage + macOS banner    │
+     │  • Posts results, drains inbox, acks           │
+     │  • Silent when nothing changed                 │
      └────────────────────────────────────────────────┘
 ```
+
+## What's tracked, what triggers a ping
+
+For every URL we record a snapshot per fetch. The server emits notifications only on **transitions**:
+
+| Event | When |
+| --- | --- |
+| `job_opened` | Page was unavailable, now available — covers "applications opened" for jobs you've marked **watching** |
+| `job_removed` | Page was available, now 404 / "no longer accepting" |
+| `deadline_set` | Job had no deadline; the page now has one |
+| `deadline_soon` | Daily scan: deadline falls within 3 days, one ping per (job, day) |
+| `new_similar` | New sibling postings appeared at a tracked company's careers index |
+
+If none of those happened during a tick, the agent stays silent — no daily noise.
+
+## "I want to apply in 2027" — the `watching` status
+
+Set a job's status to **watching** and optionally a target apply date. The agent keeps fetching it every 3h. The moment the page transitions from unavailable to available — or its deadline gets announced — you get a ping.
+
+Use this for cohorted programs (internships, fellowships, returnships) that haven't opened yet, or roles you want to revisit later.
 
 ## Repo layout
 
 | Path | What |
 | --- | --- |
 | `web/` | Next.js 15 app — deploys to Vercel |
-| `agent/` | Node CLI users install on their Mac |
+| `agent/` | Node CLI that users install on their Mac |
 | `packages/db/` | Drizzle schema + libSQL client |
-| `packages/core/` | Site adapters (Greenhouse / Lever / Ashby / LinkedIn / generic) and shared fetch helpers |
+| `packages/core/` | Site adapters + shared fetch helpers |
 
-## One-time setup (you, the operator)
+## Operator setup (one-time, by you)
 
-1. **Turso DB** — create a free database at <https://turso.tech>:
+1. **Turso DB** — free at <https://turso.tech>:
    ```bash
    turso db create job-tracker
-   turso db show job-tracker --url
-   turso db tokens create job-tracker
+   turso db show job-tracker --url        # → TURSO_DATABASE_URL
+   turso db tokens create job-tracker     # → TURSO_AUTH_TOKEN
    ```
-2. **Google OAuth** — create credentials at <https://console.cloud.google.com/apis/credentials>. Authorized redirect URI: `https://YOUR-DOMAIN.vercel.app/api/auth/callback/google` (and `http://localhost:3000/api/auth/callback/google` for dev).
-3. **(Optional) Resend** — for the email digest fallback. Free at <https://resend.com>.
+2. **Google OAuth** — credentials at <https://console.cloud.google.com/apis/credentials>. Authorized redirect URI: `https://YOUR-DOMAIN.vercel.app/api/auth/callback/google` (and `http://localhost:3000/api/auth/callback/google` for dev).
+3. **Public Git repo** — push this monorepo somewhere users can `git clone` it. The hosted `install.sh` clones from the URL you set in `JOBTRACKER_REPO_URL` (no default — required).
 4. **Local install + push schema:**
    ```bash
    npm install
-   cp web/.env.example web/.env.local
-   # fill in TURSO_*, AUTH_*, AUTH_SECRET (openssl rand -base64 32)
+   cp web/.env.example web/.env.local      # fill in values
    TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... npm run db:push
    npm run dev:web
    ```
@@ -54,27 +71,28 @@ A multi-tenant job tracker. Hosted dashboard on Vercel; an optional Mac agent ru
    ```bash
    cd web && vercel
    ```
-   In the Vercel dashboard, set the env vars from `.env.example`. Add `CRON_SECRET` to gate the cron endpoints.
+   Set env vars in the Vercel dashboard:
+   - `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
+   - `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `NEXTAUTH_URL`
+   - `CRON_SECRET` (any random string — gates the cron endpoints)
+   - `JOBTRACKER_REPO_URL` — the public Git URL the installer clones from
+   - `JOBTRACKER_REPO_BRANCH` (optional, default `main`)
 
-## How users use it
+## End-user flow
 
 1. Sign in with Google.
-2. Create a portfolio (e.g., "NYC startups").
-3. Paste job URLs. The web app fetches what it can statically.
-4. Optional: open `/agent`, mint a token, run the one-line installer on their Mac:
+2. Create a portfolio (e.g., "NYC startups", "2027 internships").
+3. Paste job URLs. The web fetches what it can statically (Greenhouse / Lever / Ashby / generic JSON-LD).
+4. Optionally set status + target apply date per job.
+5. **Optional Mac agent** — open `/agent` on the deployed site, mint a token, run:
    ```bash
    curl -fsSL https://YOUR-DOMAIN.vercel.app/install.sh | bash
    ```
-   The installer drops `~/Library/LaunchAgents/com.jobtracker.agent.plist`. It runs at login and every 3 hours.
-5. To get iMessage delivery, set `JOBTRACKER_IMESSAGE_TO=+15555550123` in `~/.jobtracker/agent/.env`.
+   Paths default to `~/.jobtracker` but honor `$JOBTRACKER_HOME` if you want to relocate. To enable iMessage delivery, set `JOBTRACKER_IMESSAGE_TO=+15555550123` in `~/.jobtracker/agent/.env`.
 
-## What gets tracked
+### Why agent runs are coalesced on boot
 
-For every URL, every fetch records a snapshot. We detect:
-
-- **Removed** — page goes 404, or contains "no longer accepting applications". Status flips to `removed`.
-- **Deadline soon** — JSON-LD `validThrough` parsed; the digest surfaces deadlines in the next 7 days.
-- **Similar postings** — for adapters that support it (Greenhouse / Lever / Ashby), the careers index is scanned and new sibling postings appear under "Similar postings discovered" in the portfolio.
+The launchd plist uses `RunAtLoad=true` + `StartInterval=10800`. While the Mac is asleep / off, no `StartInterval` firings stack up — macOS just runs the agent **once** when the laptop wakes (via `RunAtLoad`), then resumes every-3-hour ticks. Exactly the "aggregate while off, single check on next boot" behavior.
 
 ## Adapters
 
@@ -86,7 +104,7 @@ For every URL, every fetch records a snapshot. We detect:
 | LinkedIn | – | ✓ |
 | Generic (JSON-LD `JobPosting`) | ✓ | – |
 
-Adding an adapter: implement `SiteAdapter` in `packages/core/src/adapters/` and register it in `adapters/index.ts`.
+Adding an adapter: implement `SiteAdapter` in [`packages/core/src/adapters/`](packages/core/src/adapters/) and register it in [`adapters/index.ts`](packages/core/src/adapters/index.ts).
 
 ## Privacy
 
@@ -98,5 +116,5 @@ Adding an adapter: implement `SiteAdapter` in `packages/core/src/adapters/` and 
 
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.jobtracker.agent.plist
-rm -rf ~/.jobtracker ~/Library/LaunchAgents/com.jobtracker.agent.plist
+rm -rf "${JOBTRACKER_HOME:-$HOME/.jobtracker}" ~/Library/LaunchAgents/com.jobtracker.agent.plist
 ```

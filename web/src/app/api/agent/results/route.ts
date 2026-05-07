@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { bearerFromHeader, userIdForAgentToken } from "@/lib/agent-auth";
-import { db } from "@/lib/db";
-import { upsertJobFromFetch, recordSimilar, priorAvailability } from "@/lib/persist";
+import { db, schema } from "@/lib/db";
+import {
+  upsertJobFromFetch,
+  recordSimilar,
+  emitNotification,
+} from "@/lib/persist";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 const resultSchema = z.object({
@@ -52,38 +57,86 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const events: Array<{ kind: string; jobId?: string; payload: unknown }> = [];
+  let eventsEmitted = 0;
 
   for (const r of parsed.data.results) {
     if (!r.ok || !r.job) continue;
-    for (const portfolioId of r.portfolioIds.length > 0 ? r.portfolioIds : [null]) {
-      if (!portfolioId) continue; // Need at least one portfolio
-      const fetched = {
-        ...r.job,
-        deadline: r.job.deadline ? new Date(r.job.deadline) : undefined,
-        postedAt: r.job.postedAt ? new Date(r.job.postedAt) : undefined,
-      };
-      const jobId = await upsertJobFromFetch(
+    const portfolioIds = r.portfolioIds.length > 0 ? r.portfolioIds : [];
+    if (portfolioIds.length === 0) continue;
+
+    const fetched = {
+      ...r.job,
+      deadline: r.job.deadline ? new Date(r.job.deadline) : undefined,
+      postedAt: r.job.postedAt ? new Date(r.job.postedAt) : undefined,
+    };
+
+    for (const portfolioId of portfolioIds) {
+      const change = await upsertJobFromFetch(
         { userId, portfolioId, url: r.url },
         fetched,
         r.httpStatus
       );
-      const wasAvailable = await priorAvailability(jobId);
-      if (wasAvailable === true && !fetched.available) {
-        events.push({ kind: "job_removed", jobId, payload: { url: r.url } });
+
+      // Re-read the job for the notification payload (title/company etc.)
+      const job = await db.query.jobs.findFirst({
+        where: (j, { eq }) => eq(j.id, change.jobId),
+      });
+      const summary = jobSummary(job);
+
+      // Transition events ------------------------------------------------
+      // Don't notify on the very first time we see a job — that's just adding it.
+      if (!change.isNew) {
+        if (change.priorAvailable === false && fetched.available) {
+          await emitNotification(userId, change.jobId, "job_opened", {
+            ...summary,
+            portfolioId,
+          });
+          eventsEmitted++;
+        }
+        if (change.priorAvailable === true && !fetched.available) {
+          await emitNotification(userId, change.jobId, "job_removed", {
+            ...summary,
+            portfolioId,
+          });
+          eventsEmitted++;
+        }
+        if (change.deadlineNewlySet && fetched.deadline) {
+          await emitNotification(userId, change.jobId, "deadline_set", {
+            ...summary,
+            deadline: fetched.deadline.toISOString(),
+            portfolioId,
+          });
+          eventsEmitted++;
+        }
       }
+
       if (r.similar && r.similar.length > 0) {
-        const added = await recordSimilar(
-          portfolioId,
-          jobId,
-          r.similar.map((s) => ({ ...s }))
-        );
+        const added = await recordSimilar(portfolioId, change.jobId, r.similar);
         if (added > 0) {
-          events.push({ kind: "new_similar", jobId, payload: { count: added, portfolioId } });
+          await emitNotification(userId, change.jobId, "new_similar", {
+            count: added,
+            portfolioId,
+            sample: r.similar.slice(0, 3).map((s) => ({ title: s.title, url: s.url })),
+          });
+          eventsEmitted++;
         }
       }
     }
   }
 
-  return NextResponse.json({ ok: true, events });
+  return NextResponse.json({ ok: true, eventsEmitted });
 }
+
+function jobSummary(j: typeof schema.jobs.$inferSelect | undefined) {
+  if (!j) return {};
+  return {
+    title: j.title,
+    company: j.company,
+    location: j.location,
+    url: j.url,
+    site: j.site,
+  };
+}
+
+// silence unused import warning for `eq`
+void eq;

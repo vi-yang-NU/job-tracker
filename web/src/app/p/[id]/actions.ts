@@ -8,6 +8,16 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+const STATUSES = [
+  "active",
+  "watching",
+  "removed",
+  "applied",
+  "rejected",
+  "offered",
+  "withdrawn",
+] as const;
+
 const addSchema = z.object({
   portfolioId: z.string().min(1),
   url: z.string().url(),
@@ -89,4 +99,41 @@ export async function removeJobAction(formData: FormData) {
       )
     );
   revalidatePath(`/p/${portfolioId}`);
+}
+
+const updateStatusSchema = z.object({
+  portfolioId: z.string().min(1),
+  jobId: z.string().min(1),
+  status: z.enum(STATUSES),
+  targetApplyDate: z.string().optional(),
+});
+
+export async function updateJobAction(formData: FormData) {
+  const { userId } = await requireUser();
+  const parsed = updateStatusSchema.parse({
+    portfolioId: formData.get("portfolioId"),
+    jobId: formData.get("jobId"),
+    status: formData.get("status"),
+    targetApplyDate: formData.get("targetApplyDate") ?? undefined,
+  });
+  // Confirm ownership
+  const job = await db.query.jobs.findFirst({
+    where: (j, { and, eq }) => and(eq(j.id, parsed.jobId), eq(j.userId, userId)),
+  });
+  if (!job) throw new Error("not found");
+
+  let target: Date | null = null;
+  if (parsed.targetApplyDate && parsed.targetApplyDate.trim()) {
+    const d = new Date(parsed.targetApplyDate);
+    if (!Number.isNaN(d.getTime())) target = d;
+  }
+
+  await db
+    .update(schema.jobs)
+    .set({
+      status: parsed.status,
+      targetApplyDate: target ?? null,
+    })
+    .where(eq(schema.jobs.id, parsed.jobId));
+  revalidatePath(`/p/${parsed.portfolioId}`);
 }

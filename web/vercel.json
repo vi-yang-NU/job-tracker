@@ -5,7 +5,7 @@
       "schedule": "0 */3 * * *"
     },
     {
-      "path": "/api/cron/digest",
+      "path": "/api/cron/deadlines",
       "schedule": "0 13 * * *"
     }
   ]

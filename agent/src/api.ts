@@ -10,20 +10,18 @@ export interface RemoteJob {
   portfolioIds: string[];
 }
 
-export interface Digest {
-  generatedAt: string;
-  upcoming: Array<{
-    id: string;
-    title: string | null;
-    company: string | null;
-    location: string | null;
-    url: string;
-    site: string;
-    deadline: string | null;
-    status: string;
-  }>;
-  removed: Digest["upcoming"];
-  newSimilar: Array<{ url: string; title: string | null; site: string; portfolio: string }>;
+export interface InboxItem {
+  id: string;
+  kind:
+    | "deadline_soon"
+    | "deadline_set"
+    | "job_opened"
+    | "job_removed"
+    | "new_similar"
+    | "fetch_failed";
+  jobId: string | null;
+  payload: Record<string, unknown>;
+  createdAt: string;
 }
 
 export class Api {
@@ -53,12 +51,19 @@ export class Api {
     return this.req<{ jobs: RemoteJob[] }>("/api/agent/jobs");
   }
 
-  digest() {
-    return this.req<Digest>("/api/agent/digest");
+  inbox() {
+    return this.req<{ notifications: InboxItem[] }>("/api/agent/inbox");
+  }
+
+  ackInbox(ids: string[], via: "imessage" | "macos_notification" | "stdout") {
+    return this.req<{ ok: boolean; count: number }>("/api/agent/inbox/ack", {
+      method: "POST",
+      body: JSON.stringify({ ids, via }),
+    });
   }
 
   postResults(results: unknown) {
-    return this.req<{ ok: boolean; events: Array<{ kind: string }> }>("/api/agent/results", {
+    return this.req<{ ok: boolean; eventsEmitted: number }>("/api/agent/results", {
       method: "POST",
       body: JSON.stringify({ results }),
     });

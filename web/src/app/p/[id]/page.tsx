@@ -4,7 +4,17 @@ import { and, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import MapWrapper from "./MapWrapper";
-import { addJobAction, removeJobAction } from "./actions";
+import { addJobAction, removeJobAction, updateJobAction } from "./actions";
+
+const STATUS_OPTIONS = [
+  "active",
+  "watching",
+  "applied",
+  "rejected",
+  "offered",
+  "withdrawn",
+  "removed",
+] as const;
 
 export default async function PortfolioPage({
   params,
@@ -83,36 +93,78 @@ export default async function PortfolioPage({
           ) : (
             <ul className="divide-y rounded-lg border bg-white">
               {jobs.map((j) => (
-                <li key={j.id} className="flex items-start justify-between gap-3 p-3">
-                  <div className="min-w-0">
-                    <a
-                      href={j.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block truncate font-medium hover:underline"
-                    >
-                      {j.title || j.url}
-                    </a>
-                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-black/60">
-                      {j.company ? <span>{j.company}</span> : null}
-                      {j.location ? <span>{j.location}</span> : null}
-                      <span>· {j.site}</span>
-                      <StatusPill status={j.status} />
-                      {j.deadline ? (
-                        <span>
-                          · deadline{" "}
-                          {new Date(j.deadline).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                      ) : null}
+                <li key={j.id} className="space-y-2 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <a
+                        href={j.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block truncate font-medium hover:underline"
+                      >
+                        {j.title || j.url}
+                      </a>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-black/60">
+                        {j.company ? <span>{j.company}</span> : null}
+                        {j.location ? <span>{j.location}</span> : null}
+                        <span>· {j.site}</span>
+                        <StatusPill status={j.status} />
+                        {j.deadline ? (
+                          <span>
+                            · deadline{" "}
+                            {new Date(j.deadline).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        ) : null}
+                        {j.targetApplyDate ? (
+                          <span>
+                            · applying{" "}
+                            {new Date(j.targetApplyDate).toLocaleDateString(undefined, {
+                              year: "numeric",
+                              month: "short",
+                            })}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
+                    <form action={removeJobAction}>
+                      <input type="hidden" name="portfolioId" value={id} />
+                      <input type="hidden" name="jobId" value={j.id} />
+                      <button className="text-xs text-black/50 hover:text-red-600">
+                        remove
+                      </button>
+                    </form>
                   </div>
-                  <form action={removeJobAction}>
+
+                  <form action={updateJobAction} className="flex flex-wrap items-center gap-2 text-xs">
                     <input type="hidden" name="portfolioId" value={id} />
                     <input type="hidden" name="jobId" value={j.id} />
-                    <button className="text-xs text-black/50 hover:text-red-600">remove</button>
+                    <label className="text-black/50">Status</label>
+                    <select
+                      name="status"
+                      defaultValue={j.status}
+                      className="rounded border px-1.5 py-0.5"
+                    >
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="text-black/50">Target apply</label>
+                    <input
+                      type="date"
+                      name="targetApplyDate"
+                      defaultValue={
+                        j.targetApplyDate
+                          ? new Date(j.targetApplyDate).toISOString().slice(0, 10)
+                          : ""
+                      }
+                      className="rounded border px-1.5 py-0.5"
+                    />
+                    <button className="rounded border px-2 py-0.5 hover:bg-black/5">save</button>
                   </form>
                 </li>
               ))}
@@ -153,11 +205,13 @@ function StatusPill({ status }: { status: string }) {
   const tone =
     status === "active"
       ? "bg-emerald-100 text-emerald-800"
-      : status === "removed"
-        ? "bg-amber-100 text-amber-800"
-        : status === "applied"
-          ? "bg-blue-100 text-blue-800"
-          : "bg-black/10 text-black/70";
+      : status === "watching"
+        ? "bg-violet-100 text-violet-800"
+        : status === "removed"
+          ? "bg-amber-100 text-amber-800"
+          : status === "applied"
+            ? "bg-blue-100 text-blue-800"
+            : "bg-black/10 text-black/70";
   return (
     <span className={`rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${tone}`}>
       {status}
