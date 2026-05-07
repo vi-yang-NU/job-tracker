@@ -3,6 +3,9 @@ import { tick } from "./tick";
 import { Api } from "./api";
 import { loadConfig } from "./config";
 
+// Show up as "jobtracker-agent" in macOS Activity Monitor / `ps`, not "node".
+process.title = "jobtracker-agent";
+
 async function main() {
   const cmd = process.argv[2] ?? "tick";
 
@@ -24,6 +27,20 @@ async function main() {
       console.log(JSON.stringify(inbox.notifications, null, 2));
       break;
     }
+    case "welcome": {
+      const { macNotify, iMessage } = await import("./notify");
+      const to = process.env.JOBTRACKER_IMESSAGE_TO;
+      const cfg = loadConfig();
+      const api = new Api(cfg);
+      const me = await api.me().catch(() => null);
+      const greeting = me?.name ? `Welcome, ${me.name}!` : "Welcome to jobtracker!";
+      const body =
+        "Agent installed. You'll get pings here when a tracked job opens, gets a deadline, or disappears.";
+      await macNotify(greeting, body);
+      if (to) await iMessage(`${greeting} ${body}`, to);
+      console.log("[welcome] notification sent");
+      break;
+    }
     case "help":
     default:
       console.log(`jobtracker agent
@@ -32,6 +49,7 @@ Commands:
   tick     Fetch all tracked jobs, post results, then deliver inbox. (default)
   whoami   Verify the agent token.
   inbox    Print pending notifications without delivering them.
+  welcome  Send a one-time welcome notification (used by the installer).
 
 Env:
   JOBTRACKER_API           API base

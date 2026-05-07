@@ -4,6 +4,11 @@ import { eq, isNull, and } from "drizzle-orm";
 import { generateAgentToken } from "@/lib/agent-auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import CodeBlock from "./CodeBlock";
+
+const INSTALL_CMD = `curl -fsSL https://${(process.env.NEXTAUTH_URL ?? "your-vercel-domain").replace(/^https?:\/\//, "")}/install.sh | bash`;
+const UNINSTALL_CMD = `launchctl unload ~/Library/LaunchAgents/com.jobtracker.agent.plist 2>/dev/null
+rm -rf ~/.jobtracker ~/Library/LaunchAgents/com.jobtracker.agent.plist`;
 
 export default async function AgentPage() {
   const { userId } = await requireUser();
@@ -28,13 +33,27 @@ export default async function AgentPage() {
 
       <section className="animate-rise-delay-1 card-hover rounded-lg border border-black/10 bg-white p-4">
         <h2 className="text-sm font-semibold">Install on your Mac</h2>
-        <pre className="mt-2 overflow-x-auto rounded bg-black/90 p-3 text-xs text-white">
-{`curl -fsSL https://${process.env.NEXTAUTH_URL?.replace(/^https?:\/\//, "") ?? "your-vercel-domain"}/install.sh | bash`}
-        </pre>
+        <div className="mt-2">
+          <CodeBlock value={INSTALL_CMD} />
+        </div>
         <p className="mt-2 text-xs text-black/60">
           Installs to <code>~/.jobtracker</code> and registers a launchd agent that runs at login
-          + every 3 hours.
+          + every 3 hours. After install you'll get a "Welcome to jobtracker" notification so you
+          know it's wired up.
         </p>
+
+        <details className="group mt-4 rounded-md border border-black/10 bg-black/[0.02] p-3 text-xs">
+          <summary className="cursor-pointer select-none font-medium text-black/70 transition-colors duration-150 hover:text-black">
+            Uninstall / reinstall
+          </summary>
+          <p className="mt-2 text-black/60">
+            Removes the launchd job, the install dir, and the local token cache. Safe to re-run the
+            install command after this.
+          </p>
+          <div className="mt-2">
+            <CodeBlock value={UNINSTALL_CMD} variant="light" />
+          </div>
+        </details>
       </section>
 
       <section className="animate-rise-delay-2 card-hover rounded-lg border border-black/10 bg-white p-4">

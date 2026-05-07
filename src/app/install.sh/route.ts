@@ -140,17 +140,27 @@ EOF
 
 mkdir -p "$HOME/Library/LaunchAgents"
 NODE_BIN="$(command -v node)"
+
+# Wrapper script: lets us override argv[0] with \`exec -a\` so Activity Monitor
+# and \`ps\` show "jobtracker-agent" instead of "node".
+WRAPPER="$INSTALL_DIR/agent/jobtracker-agent"
+cat > "$WRAPPER" <<EOF
+#!/bin/bash
+cd "$INSTALL_DIR/agent"
+exec -a jobtracker-agent "$NODE_BIN" "$INSTALL_DIR/agent/dist/index.js" tick
+EOF
+chmod +x "$WRAPPER"
+
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.jobtracker.agent</string>
+  <key>Program</key><string>$WRAPPER</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$NODE_BIN</string>
-    <string>$INSTALL_DIR/agent/dist/index.js</string>
-    <string>tick</string>
+    <string>jobtracker-agent</string>
   </array>
   <key>WorkingDirectory</key><string>$INSTALL_DIR/agent</string>
   <key>EnvironmentVariables</key>
@@ -169,8 +179,12 @@ launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 launchctl start com.jobtracker.agent || true
 
+# One-time welcome ping so the user sees the agent works.
+( cd "$INSTALL_DIR/agent" && JOBTRACKER_API="$API_BASE" JOBTRACKER_TOKEN_FILE="$INSTALL_DIR/agent/.token" "$NODE_BIN" "$INSTALL_DIR/agent/dist/index.js" welcome ) || true
+
 echo ""
 echo "✓ Installed at commit $ACTUAL_SHA"
+echo "  You should see a welcome notification — that means the agent is wired up."
 echo "  Logs:        $INSTALL_DIR/agent.log"
 echo "  Run now:     launchctl start com.jobtracker.agent"
 echo "  Stop:        launchctl unload $PLIST"
