@@ -111,17 +111,22 @@ echo "Building agent..."
 npm run build:agent --silent
 
 if [ ! -f "$INSTALL_DIR/agent/.token" ]; then
-  if [ -t 0 ]; then
-    printf "Paste your agent token (from $API_BASE/agent): "
-    read -r TOKEN
-    echo "$TOKEN" > "$INSTALL_DIR/agent/.token"
-    chmod 600 "$INSTALL_DIR/agent/.token"
-  else
-    echo ""
-    echo "No token file at $INSTALL_DIR/agent/.token and no TTY to prompt." >&2
-    echo "Either pipe a token in (echo TOKEN | $0) or rerun in a terminal." >&2
+  TOKEN="\${JOBTRACKER_TOKEN:-}"
+  # When run as \`curl | bash\`, stdin is the pipe — read from the controlling
+  # tty instead so the prompt actually works.
+  if [ -z "$TOKEN" ] && [ -r /dev/tty ]; then
+    printf "Paste your agent token (from %s/agent): " "$API_BASE" > /dev/tty
+    read -r TOKEN < /dev/tty
+  fi
+  if [ -z "$TOKEN" ]; then
+    echo "" >&2
+    echo "No agent token available." >&2
+    echo "  Headless install: JOBTRACKER_TOKEN=<token> bash <(curl -fsSL $API_BASE/install.sh)" >&2
+    echo "  Or save the token to $INSTALL_DIR/agent/.token (chmod 600) then re-run." >&2
     exit 1
   fi
+  echo "$TOKEN" > "$INSTALL_DIR/agent/.token"
+  chmod 600 "$INSTALL_DIR/agent/.token"
 fi
 
 cat > "$INSTALL_DIR/agent/.env" <<EOF
