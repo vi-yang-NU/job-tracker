@@ -39,6 +39,10 @@ export async function upsertJobFromFetch(
     if (existing.status === "active" && !fetched.available) nextStatus = "removed";
     else if (existing.status === "removed" && fetched.available) nextStatus = "active";
 
+    // Description changed → invalidate parsed requirements so the agent re-runs.
+    const descriptionChanged =
+      typeof fetched.description === "string" &&
+      fetched.description !== existing.description;
     await db
       .update(schema.jobs)
       .set({
@@ -50,6 +54,8 @@ export async function upsertJobFromFetch(
         postedAt: fetched.postedAt ?? existing.postedAt,
         salaryMin: fetched.salaryMin ?? existing.salaryMin,
         salaryMax: fetched.salaryMax ?? existing.salaryMax,
+        description: fetched.description ?? existing.description,
+        requirementsParsedAt: descriptionChanged ? null : existing.requirementsParsedAt,
         site: fetched.site,
         lastFetchedAt: now,
         lastSeenAt: fetched.available ? now : existing.lastSeenAt,
@@ -72,6 +78,7 @@ export async function upsertJobFromFetch(
         postedAt: fetched.postedAt,
         salaryMin: fetched.salaryMin,
         salaryMax: fetched.salaryMax,
+        description: fetched.description,
         lastFetchedAt: now,
         lastSeenAt: fetched.available ? now : undefined,
         status: fetched.available ? "active" : "watching",
@@ -133,6 +140,7 @@ export async function emitNotification(
     | "deadline_set"
     | "job_opened"
     | "job_removed"
+    | "job_unlocked"
     | "new_similar"
     | "fetch_failed",
   payload: Record<string, unknown>

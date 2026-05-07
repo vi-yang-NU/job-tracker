@@ -16,6 +16,7 @@ export interface InboxItem {
     | "deadline_set"
     | "job_opened"
     | "job_removed"
+    | "job_unlocked"
     | "new_similar"
     | "fetch_failed";
   jobId: string | null;
@@ -65,6 +66,47 @@ export class Api {
     return this.req<{ ok: boolean; eventsEmitted: number }>("/api/agent/results", {
       method: "POST",
       body: JSON.stringify({ results }),
+    });
+  }
+
+  parseQueue() {
+    return this.req<{
+      resume: { rawText: string; lastUpdatedAt: string } | null;
+      jobs: Array<{ id: string; url: string; title: string | null; description: string | null }>;
+    }>("/api/agent/parse-queue");
+  }
+
+  parsedResume() {
+    return this.req<{
+      resume: {
+        yoe: number;
+        education: string | null;
+        skills: string[];
+        currentRole: string | null;
+        industries: string[];
+        lastUpdatedAt: string;
+        effectiveYoe: number;
+      } | null;
+    }>("/api/agent/resume");
+  }
+
+  postParsedResume(parsed: {
+    yoe: number;
+    education: string | null;
+    skills: string[];
+    currentRole: string | null;
+    industries: string[];
+  }) {
+    return this.req<{ ok: boolean }>("/api/agent/parsed-resume", {
+      method: "POST",
+      body: JSON.stringify(parsed),
+    });
+  }
+
+  postParsedJobs(items: unknown[]) {
+    return this.req<{ ok: boolean; unlockedNow: number }>("/api/agent/parsed-jobs", {
+      method: "POST",
+      body: JSON.stringify({ items }),
     });
   }
 }

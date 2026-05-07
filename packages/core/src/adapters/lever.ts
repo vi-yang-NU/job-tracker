@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { SiteAdapter, FetchResult, SimilarPosting } from "../types.js";
-import { hashContent, looksRemote, tryParseDate } from "../util.js";
+import { hashContent, looksRemote, tryParseDate, stripHtml } from "../util.js";
 
 // jobs.lever.co/<company>/<uuid>
 const RE = /^https?:\/\/jobs\.lever\.co\/([^/]+)\/([0-9a-f-]+)/i;
@@ -27,6 +27,9 @@ export const lever: SiteAdapter = {
       $(".posting-categories .location, .sort-by-location").first().text().trim() ||
       ld?.jobLocation?.address?.addressLocality ||
       undefined;
+    const description =
+      stripHtml(ld?.description) ??
+      ($(".section, .posting-content").first().text().trim() || undefined);
     return {
       ok: true,
       httpStatus: status,
@@ -41,6 +44,7 @@ export const lever: SiteAdapter = {
         isRemote: looksRemote(location),
         deadline: tryParseDate(ld?.validThrough),
         postedAt: tryParseDate(ld?.datePosted),
+        description,
         contentHash: hashContent(`${title}|${location}|${ld?.description ?? ""}`),
       },
     };

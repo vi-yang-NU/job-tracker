@@ -4,6 +4,7 @@ import { fetchHtmlWithBrowser, shutdownBrowser } from "./browser.js";
 import { formatInbox } from "./digest.js";
 import { iMessage, macNotify } from "./notify.js";
 import { loadConfig } from "./config.js";
+import { runParseStep } from "./parse-step.js";
 
 export async function tick() {
   const cfg = loadConfig();
@@ -49,6 +50,11 @@ export async function tick() {
   }
 
   await shutdownBrowser();
+
+  // Local LLM step: parse resume + job requirements + eligibility via Ollama.
+  await runParseStep(api).catch((err) => {
+    console.error(`[tick] parse step failed: ${(err as Error).message}`);
+  });
 
   // Drain the inbox: only deliver if there's something new since last tick.
   const inbox = await api.inbox();

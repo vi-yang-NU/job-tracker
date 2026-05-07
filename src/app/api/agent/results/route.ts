@@ -28,6 +28,7 @@ const resultSchema = z.object({
           isRemote: z.boolean().optional(),
           deadline: z.string().datetime().optional(),
           postedAt: z.string().datetime().optional(),
+          description: z.string().optional(),
           contentHash: z.string().optional(),
         })
         .optional(),

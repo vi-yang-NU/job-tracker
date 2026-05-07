@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { SiteAdapter, FetchResult } from "../types.js";
-import { hashContent, looksRemote, tryParseDate } from "../util.js";
+import { hashContent, looksRemote, tryParseDate, stripHtml } from "../util.js";
 
 const RE = /^https?:\/\/(?:www\.)?linkedin\.com\/jobs\/view\/(\d+)/i;
 
@@ -36,6 +36,10 @@ export const linkedin: SiteAdapter = {
       $(".topcard__flavor--bullet").first().text().trim() ||
       undefined;
     const closed = /no longer accepting applications|this job is no longer/i.test(html);
+    const description =
+      stripHtml(ld?.description) ??
+      ($(".description__text, .show-more-less-html__markup").first().text().trim() ||
+        undefined);
     return {
       ok: true,
       httpStatus: status,
@@ -50,6 +54,7 @@ export const linkedin: SiteAdapter = {
         isRemote: looksRemote(location),
         deadline: tryParseDate(ld?.validThrough),
         postedAt: tryParseDate(ld?.datePosted),
+        description,
         contentHash: hashContent(`${title}|${company}|${location}`),
       },
     };

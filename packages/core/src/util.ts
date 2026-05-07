@@ -4,6 +4,28 @@ export function hashContent(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
+/**
+ * Strip HTML tags and collapse whitespace. JSON-LD JobPosting `description`
+ * fields commonly contain raw HTML — we want plain text for LLM parsing.
+ */
+export function stripHtml(html: string | undefined | null): string | undefined {
+  if (!html) return undefined;
+  const text = html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text || undefined;
+}
+
 export function tryParseDate(s: string | undefined | null): Date | undefined {
   if (!s) return undefined;
   const d = new Date(s);

@@ -10,6 +10,7 @@ export interface FormattedNotifications {
 const HEADERS: Record<InboxItem["kind"], string> = {
   job_opened: "🟢 Now accepting applications",
   job_removed: "🔴 Posting removed",
+  job_unlocked: "🔓 You're now eligible",
   deadline_set: "⏳ Deadline announced",
   deadline_soon: "⏰ Deadline soon",
   new_similar: "✨ Similar postings",
@@ -42,13 +43,15 @@ export function formatInbox(items: InboxItem[]): FormattedNotifications | null {
         ? "opened"
         : kind === "job_removed"
           ? "removed"
-          : kind === "deadline_set"
-            ? "deadline added"
-            : kind === "deadline_soon"
-              ? "deadline soon"
-              : kind === "new_similar"
-                ? "new similar"
-                : kind;
+          : kind === "job_unlocked"
+            ? "unlocked"
+            : kind === "deadline_set"
+              ? "deadline added"
+              : kind === "deadline_soon"
+                ? "deadline soon"
+                : kind === "new_similar"
+                  ? "new similar"
+                  : kind;
     summaryParts.push(`${group.length} ${noun}`);
   }
 

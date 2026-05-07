@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { SiteAdapter, FetchResult, SimilarPosting } from "../types.js";
-import { hashContent, looksRemote, tryParseDate } from "../util.js";
+import { hashContent, looksRemote, tryParseDate, stripHtml } from "../util.js";
 
 // boards.greenhouse.io/<company>/jobs/<id>
 //   or job-boards.greenhouse.io/<company>/jobs/<id>
@@ -31,6 +31,10 @@ export const greenhouse: SiteAdapter = {
       undefined;
     const deadline = tryParseDate(ld?.validThrough);
     const postedAt = tryParseDate(ld?.datePosted);
+    const description =
+      stripHtml(ld?.description) ??
+      ($("#content, .app-content, .content, [class*='description']").first().text().trim() ||
+        undefined);
     return {
       ok: true,
       httpStatus: status,
@@ -45,6 +49,7 @@ export const greenhouse: SiteAdapter = {
         isRemote: looksRemote(location),
         deadline,
         postedAt,
+        description,
         contentHash: hashContent(`${title}|${location}|${ld?.description ?? ""}`),
       },
     };

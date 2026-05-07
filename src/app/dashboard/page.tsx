@@ -19,11 +19,33 @@ const STATUS_OPTIONS = [
 export default async function Dashboard() {
   const { userId } = await requireUser();
 
-  const jobs = await db
-    .select()
+  const rows = await db
+    .select({
+      job: schema.jobs,
+      eligibility: schema.eligibility,
+    })
     .from(schema.jobs)
+    .leftJoin(
+      schema.eligibility,
+      and(
+        eq(schema.eligibility.jobId, schema.jobs.id),
+        eq(schema.eligibility.userId, userId)
+      )
+    )
     .where(eq(schema.jobs.userId, userId))
     .orderBy(desc(schema.jobs.createdAt));
+  const jobs = rows.map((r) => r.job);
+  const eligibilityByJobId = new Map(
+    rows.filter((r) => r.eligibility).map((r) => [r.eligibility!.jobId, r.eligibility!])
+  );
+
+  const unlockingSoon = rows
+    .filter((r) => r.eligibility?.status === "future" && r.eligibility.unlockAt)
+    .sort(
+      (a, b) =>
+        a.eligibility!.unlockAt!.getTime() - b.eligibility!.unlockAt!.getTime()
+    )
+    .slice(0, 5);
 
   const similar = await db
     .select()
@@ -38,6 +60,10 @@ export default async function Dashboard() {
     schema.agentTokens,
     and(eq(schema.agentTokens.userId, userId), isNull(schema.agentTokens.revokedAt))
   );
+
+  const resume = await db.query.resumes.findFirst({
+    where: (r, { eq }) => eq(r.userId, userId),
+  });
 
   return (
     <div className="space-y-6">
@@ -56,6 +82,52 @@ export default async function Dashboard() {
         <div className="animate-rise-delay-2">
           <AgentInstallBanner />
         </div>
+      ) : null}
+
+      {!resume ? (
+        <div className="animate-rise-delay-2">
+          <ResumeUploadBanner />
+        </div>
+      ) : null}
+
+      {unlockingSoon.length > 0 ? (
+        <section className="rounded-lg border border-violet-200 bg-violet-50 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-violet-900">Unlocking soon</h2>
+            <span className="text-xs text-violet-700">
+              jobs that match your skills + education but need more YoE
+            </span>
+          </div>
+          <ul className="mt-2 divide-y divide-violet-200">
+            {unlockingSoon.map((r) => {
+              const months = Math.max(
+                0,
+                Math.round(
+                  (r.eligibility!.unlockAt!.getTime() - Date.now()) /
+                    (30 * 86400_000)
+                )
+              );
+              return (
+                <li
+                  key={r.job.id}
+                  className="flex items-center justify-between py-2 text-sm"
+                >
+                  <a
+                    href={r.job.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-violet-900 underline-offset-2 hover:underline"
+                  >
+                    {r.job.title || r.job.url}
+                  </a>
+                  <span className="text-xs text-violet-700">
+                    {months === 0 ? "any day now" : `~${months} mo`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       ) : null}
 
       <section className="grid gap-4 lg:grid-cols-[1fr,420px]">
@@ -90,6 +162,9 @@ export default async function Dashboard() {
                         {j.location ? <span>{j.location}</span> : null}
                         <span>· {j.site}</span>
                         <StatusPill status={j.status} />
+                        <EligibilityPill
+                          eligibility={eligibilityByJobId.get(j.id) ?? null}
+                        />
                         {j.deadline ? (
                           <span>
                             · deadline{" "}
@@ -203,6 +278,71 @@ function StatusPill({ status }: { status: string }) {
             ? "bg-blue-100 text-blue-800"
             : "bg-black/10 text-black/70";
   return <span className={`pill ${tone}`}>{status}</span>;
+}
+
+function EligibilityPill({
+  eligibility,
+}: {
+  eligibility: typeof schema.eligibility.$inferSelect | null;
+}) {
+  if (!eligibility) return null;
+  const { status, gaps, unlockAt } = eligibility;
+  if (status === "ready") {
+    return <span className="pill bg-emerald-200 text-emerald-900" title="Ready to apply">✓ ready</span>;
+  }
+  if (status === "stretch") {
+    const missing = gaps?.missingSkills?.length ?? 0;
+    return (
+      <span
+        className="pill bg-amber-100 text-amber-900"
+        title={gaps?.reason ?? "Some gaps — may apply with tailoring"}
+      >
+        ◐ stretch{missing > 0 ? ` · -${missing} skill${missing === 1 ? "" : "s"}` : ""}
+      </span>
+    );
+  }
+  if (status === "future") {
+    const months =
+      unlockAt && unlockAt.getTime() > Date.now()
+        ? Math.max(1, Math.round((unlockAt.getTime() - Date.now()) / (30 * 86400_000)))
+        : 0;
+    const yoe = gaps?.missingYoe ? `${gaps.missingYoe.toFixed(1)}y` : `${months}mo`;
+    return (
+      <span
+        className="pill bg-violet-100 text-violet-900"
+        title={`Needs ${yoe} more experience`}
+      >
+        ◑ +{yoe}
+      </span>
+    );
+  }
+  return <span className="pill bg-black/10 text-black/60">— unscored</span>;
+}
+
+function ResumeUploadBanner() {
+  return (
+    <section className="card-hover relative overflow-hidden rounded-lg border border-emerald-300/60 bg-gradient-to-br from-emerald-50 to-teal-50 p-4 text-sm">
+      <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-emerald-300/15 blur-2xl" />
+      <div className="relative flex items-start justify-between gap-4">
+        <div>
+          <h3 className="font-semibold">Upload your resume to see eligibility</h3>
+          <p className="mt-1 text-black/70">
+            We'll show whether each job is{" "}
+            <span className="font-medium text-emerald-800">ready</span>,{" "}
+            <span className="font-medium text-amber-800">stretch</span>, or how many{" "}
+            <span className="font-medium text-violet-800">years away</span> it is. Parsing happens
+            locally on your Mac via Ollama — your resume text stays out of the cloud.
+          </p>
+        </div>
+        <Link href="/settings" className="btn-primary group shrink-0 px-3 py-1.5 text-xs">
+          Upload resume
+          <span className="ml-1 inline-block transition-transform duration-150 group-hover:translate-x-0.5">
+            →
+          </span>
+        </Link>
+      </div>
+    </section>
+  );
 }
 
 function AgentInstallBanner() {

@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { SiteAdapter, FetchResult } from "../types.js";
-import { hashContent, looksRemote, tryParseDate } from "../util.js";
+import { hashContent, looksRemote, tryParseDate, stripHtml } from "../util.js";
 
 /** Last-resort adapter: tries JSON-LD JobPosting then falls back to <title>. */
 export const generic: SiteAdapter = {
@@ -18,6 +18,9 @@ export const generic: SiteAdapter = {
     const company =
       ld?.hiringOrganization?.name || $("meta[property='og:site_name']").attr("content");
     const location = ld?.jobLocation?.address?.addressLocality;
+    const description =
+      stripHtml(ld?.description) ??
+      ($("main, [role='main'], article").first().text().trim() || undefined);
     return {
       ok: true,
       httpStatus: status,
@@ -32,6 +35,7 @@ export const generic: SiteAdapter = {
         isRemote: looksRemote(location),
         deadline: tryParseDate(ld?.validThrough),
         postedAt: tryParseDate(ld?.datePosted),
+        description,
         contentHash: hashContent(`${title}|${location}|${ld?.description ?? ""}`),
       },
     };

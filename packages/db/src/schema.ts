@@ -108,6 +108,17 @@ export const jobs = sqliteTable(
       .notNull()
       .default("active"),
     notes: text("notes"),
+    /** Plain-text job description, populated by adapters when available. */
+    description: text("description"),
+    /** LLM-parsed requirements: { yoeMin, yoeMax, education, skills_required, skills_nice }. */
+    requirements: text("requirements", { mode: "json" }).$type<{
+      yoeMin?: number;
+      yoeMax?: number;
+      education?: "highschool" | "associate" | "bachelor" | "master" | "phd";
+      skillsRequired?: string[];
+      skillsNice?: string[];
+    }>(),
+    requirementsParsedAt: integer("requirements_parsed_at", { mode: "timestamp_ms" }),
     lastFetchedAt: integer("last_fetched_at", { mode: "timestamp_ms" }),
     lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
@@ -206,6 +217,7 @@ export const notifications = sqliteTable(
         "deadline_set",
         "job_opened",
         "job_removed",
+        "job_unlocked",
         "new_similar",
         "fetch_failed",
         "digest",
@@ -223,8 +235,67 @@ export const notifications = sqliteTable(
   })
 );
 
+export const resumes = sqliteTable("resumes", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** Raw resume text. Optional — once parsed we don't need it for matching. */
+  rawText: text("raw_text"),
+  /** Structured snapshot the agent extracts via Ollama. */
+  parsed: text("parsed", { mode: "json" }).$type<{
+    yoe?: number;
+    education?: "highschool" | "associate" | "bachelor" | "master" | "phd";
+    skills?: string[];
+    currentRole?: string | null;
+    industries?: string[];
+  }>(),
+  parsedAt: integer("parsed_at", { mode: "timestamp_ms" }),
+  /**
+   * When the user last said their resume reflects current state. Used to
+   * compute current YoE: yoe + (now - lastUpdatedAt) in years.
+   */
+  lastUpdatedAt: integer("last_updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export const eligibility = sqliteTable(
+  "eligibility",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["ready", "stretch", "future", "unknown"],
+    }).notNull(),
+    gaps: text("gaps", { mode: "json" }).$type<{
+      missingYoe?: number;
+      missingSkills?: string[];
+      missingEducation?: string;
+      reason?: string;
+    }>(),
+    /** For status='future': when the user's YoE will satisfy the requirement. */
+    unlockAt: integer("unlock_at", { mode: "timestamp_ms" }),
+    computedAt: integer("computed_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.jobId] }),
+    userIdx: index("eligibility_user_idx").on(t.userId, t.status),
+  })
+);
+
 export type User = typeof users.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
+export type Resume = typeof resumes.$inferSelect;
+export type Eligibility = typeof eligibility.$inferSelect;
 export type Snapshot = typeof snapshots.$inferSelect;
 export type SimilarJob = typeof similarJobs.$inferSelect;
 export type AgentToken = typeof agentTokens.$inferSelect;

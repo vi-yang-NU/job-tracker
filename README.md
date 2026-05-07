@@ -74,6 +74,35 @@ Use this for cohorted programs (internships, fellowships, returnships) that have
    - `JOBTRACKER_REPO_URL` — the public Git URL the installer clones from
    - `JOBTRACKER_REPO_BRANCH` (optional, default `main`)
 
+## Resume + eligibility (optional, requires Ollama)
+
+The Mac agent can score every tracked job against your resume — green ✓ if
+you're ready to apply, ◐ stretch if you'd need to tailor, ◑ +Xy if you need
+more years of experience. Time-based unlocks fire when your YoE catches up.
+
+All LLM work runs **locally on your Mac via Ollama**. Your resume text never
+leaves your machine after the initial upload — Vercel only stores the
+structured snapshot (years, skills, education).
+
+**Install Ollama before running the agent installer:**
+
+```bash
+brew install ollama
+brew services start ollama        # runs on boot
+ollama pull llama3.1:8b           # ~4.7GB, one-time
+```
+
+After that:
+1. Open `/settings` on the deployed site → paste resume text → Save.
+2. Re-run the agent (or wait for the next 3-hour tick).
+3. The agent runs Ollama locally to extract `{ yoe, education, skills }`,
+   then for each tracked job extracts requirements and computes eligibility.
+4. The dashboard shows ✓/◐/◑ pills per job; an "Unlocking soon" section
+   surfaces jobs becoming eligible in the next ~12 months.
+
+If you have a different model, set `OLLAMA_MODEL` in `~/.jobtracker/agent/.env`.
+Anything that supports `format: "json"` works — `gemma2:2b`, `qwen2.5:7b`, etc.
+
 ## End-user flow
 
 1. Sign in with Google.

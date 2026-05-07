@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import type { SiteAdapter, FetchResult, SimilarPosting } from "../types.js";
-import { hashContent, looksRemote, tryParseDate } from "../util.js";
+import { hashContent, looksRemote, tryParseDate, stripHtml } from "../util.js";
 
 // jobs.ashbyhq.com/<company>/<uuid>
 const RE = /^https?:\/\/jobs\.ashbyhq\.com\/([^/]+)\/([0-9a-f-]+)/i;
@@ -19,6 +19,7 @@ export const ashby: SiteAdapter = {
     const title = ld?.title || $("h1").first().text().trim() || undefined;
     const location =
       ld?.jobLocation?.address?.addressLocality || ld?.jobLocation?.address?.addressRegion;
+    const description = stripHtml(ld?.description);
     return {
       ok: true,
       httpStatus: status,
@@ -33,6 +34,7 @@ export const ashby: SiteAdapter = {
         isRemote: looksRemote(location),
         deadline: tryParseDate(ld?.validThrough),
         postedAt: tryParseDate(ld?.datePosted),
+        description,
         contentHash: hashContent(`${title}|${location}|${ld?.description ?? ""}`),
       },
     };

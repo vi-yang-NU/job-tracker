@@ -90,6 +90,13 @@ for cmd in node npm git; do
   fi
 done
 
+# Ollama is optional but powers the resume / eligibility analysis. Warn if
+# it's missing — install proceeds either way.
+if ! command -v ollama >/dev/null 2>&1; then
+  echo "ⓘ  Ollama not found — resume + eligibility analysis will be skipped."
+  echo "   To enable: brew install ollama && brew services start ollama && ollama pull llama3.1:8b"
+fi
+
 if [ -d "$INSTALL_DIR/.git" ]; then
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$REF" || git -C "$INSTALL_DIR" fetch origin "$BRANCH"
   git -C "$INSTALL_DIR" -c advice.detachedHead=false checkout --force "$REF" 2>/dev/null \
@@ -143,6 +150,9 @@ fi
   else
     echo "# JOBTRACKER_IMESSAGE_TO=+15555550123  # add a number/email here to enable iMessages"
   fi
+  echo "# Ollama settings (defaults assume \\\`brew install ollama\\\` is running locally)"
+  echo "# OLLAMA_BASE=http://localhost:11434"
+  echo "# OLLAMA_MODEL=llama3.1:8b"
 } > "$INSTALL_DIR/agent/.env"
 
 ( cd "$INSTALL_DIR/agent" && npx playwright install chromium >/dev/null 2>&1 ) || true
