@@ -5,12 +5,14 @@ import CopyCommand from "./CopyCommand";
 
 export default async function Settings() {
   const { userId } = await requireUser();
-  const u = await db.query.users.findFirst({
-    where: (t, { eq }) => eq(t.id, userId),
-  });
-  const resume = await db.query.resumes.findFirst({
-    where: (r, { eq }) => eq(r.userId, userId),
-  });
+  const [u, resume] = await Promise.all([
+    db.query.users.findFirst({
+      where: (t, { eq }) => eq(t.id, userId),
+    }),
+    db.query.resumes.findFirst({
+      where: (r, { eq }) => eq(r.userId, userId),
+    }),
+  ]);
   if (!u) return null;
 
   const parsed = resume?.parsed;

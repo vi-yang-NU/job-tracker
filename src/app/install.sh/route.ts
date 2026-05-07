@@ -90,16 +90,62 @@ for cmd in node npm git; do
   fi
 done
 
-# Ollama is optional but powers the resume / eligibility analysis. Warn if
-# it's missing — install proceeds either way.
-if ! command -v ollama >/dev/null 2>&1; then
-  echo "ⓘ  Ollama not found — resume + eligibility analysis will be skipped."
-  echo "   To enable:"
-  echo "     brew install ollama"
-  echo "     brew services start ollama"
-  echo "     ollama pull llama3.1:8b        # generation"
-  echo "     ollama pull nomic-embed-text   # embeddings (RAG)"
+# Ollama powers the resume + eligibility analysis (all local, your text never
+# leaves the machine). The installer ensures the daemon is running and the
+# generation + embedding models are pulled before we hand off to launchd.
+GEN_MODEL="\${OLLAMA_MODEL:-llama3.1:8b}"
+EMBED_MODEL="\${OLLAMA_EMBED_MODEL:-nomic-embed-text}"
+
+ensure_ollama_ready() {
+  if ! command -v ollama >/dev/null 2>&1 && [ ! -d "/Applications/Ollama.app" ]; then
+    echo "⚠  Ollama not found — resume + eligibility scoring will be skipped."
+    echo "   Install from https://ollama.com (or 'brew install --cask ollama')"
+    echo "   then re-run this installer."
+    return 1
+  fi
+
+  # Launch the menu-bar app if it's installed — it bundles the daemon.
+  # Fall back to brew services for the CLI-only homebrew install.
+  if [ -d "/Applications/Ollama.app" ]; then
+    open -a Ollama 2>/dev/null || true
+  elif command -v brew >/dev/null 2>&1; then
+    brew services start ollama 2>/dev/null || true
+  fi
+
+  # Wait up to 15s for the daemon to listen on :11434.
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    if curl -fsS http://localhost:11434/api/tags >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "⚠  Ollama daemon not reachable on :11434 after 15s."
+  echo "   Open Ollama.app manually and re-run."
+  return 1
+}
+
+ensure_model() {
+  local model="$1"
+  local kind="$2"
+  if curl -fsS http://localhost:11434/api/tags 2>/dev/null | grep -q "\\"name\\":\\"$model\\""; then
+    echo "  ✓ $kind model already pulled: $model"
+    return 0
+  fi
+  echo "  ↓ pulling $kind model: $model (this can take several minutes)…"
+  if ollama pull "$model"; then
+    echo "  ✓ pulled $model"
+  else
+    echo "  ⚠  failed to pull $model — eligibility scoring may be limited"
+  fi
+}
+
+echo "Setting up Ollama (local LLM for resume + eligibility analysis)…"
+if ensure_ollama_ready; then
+  ensure_model "$GEN_MODEL" "generation"
+  ensure_model "$EMBED_MODEL" "embedding"
 fi
+echo ""
 
 if [ -d "$INSTALL_DIR/.git" ]; then
   git -C "$INSTALL_DIR" fetch --depth 1 origin "$REF" || git -C "$INSTALL_DIR" fetch origin "$BRANCH"

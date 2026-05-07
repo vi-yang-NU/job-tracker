@@ -20,21 +20,38 @@ const STATUS_OPTIONS = [
 export default async function Dashboard() {
   const { userId } = await requireUser();
 
-  const rows = await db
-    .select({
-      job: schema.jobs,
-      eligibility: schema.eligibility,
-    })
-    .from(schema.jobs)
-    .leftJoin(
-      schema.eligibility,
-      and(
-        eq(schema.eligibility.jobId, schema.jobs.id),
-        eq(schema.eligibility.userId, userId)
+  const [rows, similar, tokenCount, resume] = await Promise.all([
+    db
+      .select({
+        job: schema.jobs,
+        eligibility: schema.eligibility,
+      })
+      .from(schema.jobs)
+      .leftJoin(
+        schema.eligibility,
+        and(
+          eq(schema.eligibility.jobId, schema.jobs.id),
+          eq(schema.eligibility.userId, userId)
+        )
       )
-    )
-    .where(eq(schema.jobs.userId, userId))
-    .orderBy(desc(schema.jobs.createdAt));
+      .where(eq(schema.jobs.userId, userId))
+      .orderBy(desc(schema.jobs.createdAt)),
+    db
+      .select()
+      .from(schema.similarJobs)
+      .where(
+        and(eq(schema.similarJobs.userId, userId), isNull(schema.similarJobs.dismissedAt))
+      )
+      .orderBy(desc(schema.similarJobs.discoveredAt))
+      .limit(20),
+    db.$count(
+      schema.agentTokens,
+      and(eq(schema.agentTokens.userId, userId), isNull(schema.agentTokens.revokedAt))
+    ),
+    db.query.resumes.findFirst({
+      where: (r, { eq }) => eq(r.userId, userId),
+    }),
+  ]);
   const jobs = rows.map((r) => r.job);
   const eligibilityByJobId = new Map(
     rows.filter((r) => r.eligibility).map((r) => [r.eligibility!.jobId, r.eligibility!])
@@ -47,24 +64,6 @@ export default async function Dashboard() {
         a.eligibility!.unlockAt!.getTime() - b.eligibility!.unlockAt!.getTime()
     )
     .slice(0, 5);
-
-  const similar = await db
-    .select()
-    .from(schema.similarJobs)
-    .where(
-      and(eq(schema.similarJobs.userId, userId), isNull(schema.similarJobs.dismissedAt))
-    )
-    .orderBy(desc(schema.similarJobs.discoveredAt))
-    .limit(20);
-
-  const tokenCount = await db.$count(
-    schema.agentTokens,
-    and(eq(schema.agentTokens.userId, userId), isNull(schema.agentTokens.revokedAt))
-  );
-
-  const resume = await db.query.resumes.findFirst({
-    where: (r, { eq }) => eq(r.userId, userId),
-  });
 
   return (
     <div className="space-y-6">
