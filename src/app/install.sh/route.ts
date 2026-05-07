@@ -129,12 +129,21 @@ if [ ! -f "$INSTALL_DIR/agent/.token" ]; then
   chmod 600 "$INSTALL_DIR/agent/.token"
 fi
 
-cat > "$INSTALL_DIR/agent/.env" <<EOF
-JOBTRACKER_API=$API_BASE
-JOBTRACKER_TOKEN_FILE=$INSTALL_DIR/agent/.token
-# Optional: phone number / Apple ID to receive iMessages.
-# JOBTRACKER_IMESSAGE_TO=+15555550123
-EOF
+IMESSAGE_TO="\${JOBTRACKER_IMESSAGE_TO:-}"
+if [ -z "$IMESSAGE_TO" ] && [ -r /dev/tty ]; then
+  printf "Phone number / Apple ID for iMessage delivery (Enter to skip): " > /dev/tty
+  read -r IMESSAGE_TO < /dev/tty
+fi
+
+{
+  echo "JOBTRACKER_API=$API_BASE"
+  echo "JOBTRACKER_TOKEN_FILE=$INSTALL_DIR/agent/.token"
+  if [ -n "$IMESSAGE_TO" ]; then
+    echo "JOBTRACKER_IMESSAGE_TO=$IMESSAGE_TO"
+  else
+    echo "# JOBTRACKER_IMESSAGE_TO=+15555550123  # add a number/email here to enable iMessages"
+  fi
+} > "$INSTALL_DIR/agent/.env"
 
 ( cd "$INSTALL_DIR/agent" && npx playwright install chromium >/dev/null 2>&1 ) || true
 

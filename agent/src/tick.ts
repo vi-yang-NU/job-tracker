@@ -64,9 +64,13 @@ export async function tick() {
   await macNotify(formatted.short.title, formatted.short.body);
   let via: "macos_notification" | "imessage" = "macos_notification";
   if (iMessageTo) {
-    const ok = await iMessage(formatted.full, iMessageTo);
-    if (ok) via = "imessage";
-    console.log(`[tick] iMessage to ${iMessageTo}: ${ok ? "sent" : "failed"}`);
+    const r = await iMessage(formatted.full, iMessageTo);
+    if (r.ok) {
+      via = "imessage";
+      console.log(`[tick] iMessage to ${iMessageTo}: sent`);
+    } else {
+      console.log(`[tick] iMessage to ${iMessageTo}: failed (${r.reason})`);
+    }
   }
   await api.ackInbox(
     inbox.notifications.map((n) => n.id),

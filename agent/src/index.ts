@@ -37,8 +37,22 @@ async function main() {
       const body =
         "Agent installed. You'll get pings here when a tracked job opens, gets a deadline, or disappears.";
       await macNotify(greeting, body);
-      if (to) await iMessage(`${greeting} ${body}`, to);
-      console.log("[welcome] notification sent");
+      console.log("[welcome] macOS notification sent");
+      if (!to) {
+        console.log(
+          "[welcome] iMessage skipped — set JOBTRACKER_IMESSAGE_TO in ~/.jobtracker/agent/.env to enable"
+        );
+      } else {
+        const r = await iMessage(`${greeting} ${body}`, to);
+        if (r.ok) {
+          console.log(`[welcome] iMessage sent to ${to}`);
+        } else {
+          console.log(`[welcome] iMessage to ${to} failed: ${r.reason}`);
+          console.log(
+            "  If macOS asked for Automation permission, approve in System Settings → Privacy & Security → Automation, then re-run \`node dist/index.js welcome\`."
+          );
+        }
+      }
       break;
     }
     case "help":
