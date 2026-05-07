@@ -41,35 +41,47 @@ export default async function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Your jobs</h1>
+      <header className="animate-rise">
+        <h1 className="text-2xl font-semibold tracking-tight">Your jobs</h1>
         <p className="mt-1 text-sm text-black/60">
           Paste a URL, verify what we scraped, and we'll watch it from there.
         </p>
       </header>
 
-      <AddJobForm />
+      <div className="animate-rise-delay-1">
+        <AddJobForm />
+      </div>
 
-      {tokenCount === 0 ? <AgentInstallBanner /> : null}
+      {tokenCount === 0 ? (
+        <div className="animate-rise-delay-2">
+          <AgentInstallBanner />
+        </div>
+      ) : null}
 
       <section className="grid gap-4 lg:grid-cols-[1fr,420px]">
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold">Tracked ({jobs.length})</h2>
+          <h2 className="text-sm font-semibold text-black/70">
+            Tracked <span className="tabular-nums text-black/40">({jobs.length})</span>
+          </h2>
           {jobs.length === 0 ? (
-            <p className="rounded-md border bg-white p-4 text-sm text-black/60">
+            <p className="rounded-md border border-dashed border-black/20 bg-white/60 p-6 text-center text-sm text-black/50">
               Nothing here yet. Paste a job URL above.
             </p>
           ) : (
-            <ul className="divide-y rounded-lg border bg-white">
-              {jobs.map((j) => (
-                <li key={j.id} className="space-y-2 p-3">
+            <ul className="divide-y divide-black/[0.06] rounded-lg border border-black/10 bg-white shadow-[var(--shadow-soft)]">
+              {jobs.map((j, i) => (
+                <li
+                  key={j.id}
+                  style={{ animationDelay: `${i * 30}ms` }}
+                  className="animate-rise row-hover space-y-2 p-3"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <a
                         href={j.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="block truncate font-medium hover:underline"
+                        className="block truncate font-medium underline-offset-2 transition-colors duration-150 hover:text-accent hover:underline"
                       >
                         {j.title || j.url}
                       </a>
@@ -100,19 +112,22 @@ export default async function Dashboard() {
                     </div>
                     <form action={removeJobAction}>
                       <input type="hidden" name="jobId" value={j.id} />
-                      <button className="text-xs text-black/50 hover:text-red-600">
+                      <button className="text-xs text-black/50 transition-colors duration-150 hover:text-rose-600">
                         remove
                       </button>
                     </form>
                   </div>
 
-                  <form action={updateJobAction} className="flex flex-wrap items-center gap-2 text-xs">
+                  <form
+                    action={updateJobAction}
+                    className="flex flex-wrap items-center gap-2 text-xs"
+                  >
                     <input type="hidden" name="jobId" value={j.id} />
                     <label className="text-black/50">Status</label>
                     <select
                       name="status"
                       defaultValue={j.status}
-                      className="rounded border px-1.5 py-0.5"
+                      className="rounded border border-black/15 bg-white px-1.5 py-0.5 transition-colors duration-150 hover:border-black/30"
                     >
                       {STATUS_OPTIONS.map((s) => (
                         <option key={s} value={s}>
@@ -129,9 +144,9 @@ export default async function Dashboard() {
                           ? new Date(j.targetApplyDate).toISOString().slice(0, 10)
                           : ""
                       }
-                      className="rounded border px-1.5 py-0.5"
+                      className="rounded border border-black/15 bg-white px-1.5 py-0.5 transition-colors duration-150 hover:border-black/30"
                     />
-                    <button className="rounded border px-2 py-0.5 hover:bg-black/5">
+                    <button className="rounded border border-black/15 px-2 py-0.5 transition-colors duration-150 hover:border-black/30 hover:bg-black/5">
                       save
                     </button>
                   </form>
@@ -141,22 +156,28 @@ export default async function Dashboard() {
           )}
         </div>
 
-        <div className="h-[420px] overflow-hidden rounded-lg border bg-white">
+        <div className="h-[420px] overflow-hidden rounded-lg border border-black/10 bg-white shadow-[var(--shadow-soft)]">
           <MapWrapper jobs={jobs} />
         </div>
       </section>
 
       {similar.length > 0 ? (
         <section>
-          <h2 className="text-sm font-semibold">Similar postings discovered</h2>
-          <ul className="mt-2 divide-y rounded-lg border bg-white">
-            {similar.map((s) => (
-              <li key={s.id} className="p-3 text-sm">
+          <h2 className="text-sm font-semibold text-black/70">
+            Similar postings discovered
+          </h2>
+          <ul className="mt-2 divide-y divide-black/[0.06] rounded-lg border border-black/10 bg-white shadow-[var(--shadow-soft)]">
+            {similar.map((s, i) => (
+              <li
+                key={s.id}
+                style={{ animationDelay: `${i * 30}ms` }}
+                className="animate-rise row-hover p-3 text-sm"
+              >
                 <a
                   href={s.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-medium hover:underline"
+                  className="font-medium underline-offset-2 transition-colors duration-150 hover:text-accent hover:underline"
                 >
                   {s.title || s.url}
                 </a>
@@ -181,17 +202,14 @@ function StatusPill({ status }: { status: string }) {
           : status === "applied"
             ? "bg-blue-100 text-blue-800"
             : "bg-black/10 text-black/70";
-  return (
-    <span className={`rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${tone}`}>
-      {status}
-    </span>
-  );
+  return <span className={`pill ${tone}`}>{status}</span>;
 }
 
 function AgentInstallBanner() {
   return (
-    <section className="rounded-lg border border-accent/40 bg-blue-50 p-4 text-sm">
-      <div className="flex items-start justify-between gap-4">
+    <section className="card-hover relative overflow-hidden rounded-lg border border-accent/40 bg-gradient-to-br from-blue-50 to-indigo-50 p-4 text-sm">
+      <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-accent/10 blur-2xl" />
+      <div className="relative flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold">Get pinged when something changes</h3>
           <p className="mt-1 text-black/70">
@@ -199,11 +217,11 @@ function AgentInstallBanner() {
             job opens, gets a deadline, or disappears. Silent when nothing's new.
           </p>
         </div>
-        <Link
-          href="/agent"
-          className="shrink-0 rounded-md bg-ink px-3 py-1.5 text-xs text-white"
-        >
+        <Link href="/agent" className="btn-primary group shrink-0 px-3 py-1.5 text-xs">
           Set up agent
+          <span className="ml-1 inline-block transition-transform duration-150 group-hover:translate-x-0.5">
+            →
+          </span>
         </Link>
       </div>
     </section>

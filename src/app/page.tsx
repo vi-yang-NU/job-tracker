@@ -14,34 +14,48 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-2xl py-16">
-      <h1 className="text-4xl font-semibold tracking-tight">
+      <h1 className="animate-rise text-4xl font-semibold tracking-tight sm:text-5xl">
         Track jobs that don't ghost you.
       </h1>
-      <p className="mt-4 text-lg text-black/70">
-        Paste job links. We watch them every few hours, alert you to deadlines,
-        flag postings that disappear, and surface similar roles when they do.
+      <p className="animate-rise-delay-1 mt-4 text-lg text-black/70">
+        Paste job links. We watch them every few hours, alert you to deadlines, flag
+        postings that disappear, and surface similar roles when they do.
       </p>
-      <ul className="mt-6 space-y-2 text-black/70">
-        <li>– One paste box, no folders to organize. We scrape, you confirm.</li>
-        <li>– Map view so you can scan roles by city.</li>
-        <li>– <em>Watching</em> status for jobs that won't open until later.</li>
+      <ul className="animate-rise-delay-2 mt-6 space-y-2 text-black/70">
+        <li>— One paste box, no folders to organize. We scrape, you confirm.</li>
+        <li>— Map view so you can scan roles by city.</li>
         <li>
-          – Optional Mac agent — runs every 3 hours and sends an iMessage when
-          something actually changes.{" "}
-          <Link href="#agent" className="underline">Set it up</Link>
+          — <em>Watching</em> status for jobs that won't open until later.
+        </li>
+        <li>
+          — Optional Mac agent — runs every 3 hours and sends an iMessage when something
+          actually changes.{" "}
+          <Link
+            href="#agent"
+            className="font-medium text-accent underline-offset-2 transition-colors duration-150 hover:underline"
+          >
+            Set it up
+          </Link>
         </li>
       </ul>
-      <Link
-        href="/login"
-        className="mt-8 inline-block rounded-md bg-ink px-5 py-2.5 text-white"
-      >
-        Sign in with Google
-      </Link>
 
-      <section id="agent" className="mt-16 rounded-lg border bg-white p-6">
+      <div className="animate-rise-delay-2 mt-8">
+        <Link href="/login" className="btn-primary group px-5 py-2.5 text-base">
+          Sign in with Google
+          <span className="ml-1 inline-block transition-transform duration-150 group-hover:translate-x-0.5">
+            →
+          </span>
+        </Link>
+      </div>
+
+      <section
+        id="agent"
+        className="card-hover mt-16 rounded-lg border border-black/10 bg-white p-6"
+      >
         <h2 className="text-xl font-semibold">Optional: install the Mac agent</h2>
         <p className="mt-1 text-sm text-black/60">
-          Sign in first, then mint a token at <code>/agent</code>. After that, run this on your Mac:
+          Sign in first, then mint a token at <code>/agent</code>. After that, run this on your
+          Mac:
         </p>
         <pre className="mt-3 overflow-x-auto rounded bg-black/90 p-3 text-xs text-white">
 {`curl -fsSL ${process.env.NEXTAUTH_URL ?? "<your-deployment>"}/install.sh | bash`}
@@ -60,33 +74,56 @@ function SetupWizard({
 }: {
   status: Awaited<ReturnType<typeof getSetupStatus>>;
 }) {
+  const done = status.checks.filter((c) => c.ok).length;
+  const total = status.checks.length;
+  const pct = Math.round((done / total) * 100);
   return (
     <div className="mx-auto max-w-2xl py-12">
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+      <div className="animate-rise rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 shadow-[var(--shadow-soft)]">
         <strong>Setup not finished.</strong> This page is what end users would see — finish the
         steps below, redeploy, and this banner goes away automatically.
       </div>
 
-      <h1 className="mt-8 text-2xl font-semibold">Operator setup</h1>
-      <p className="mt-1 text-sm text-black/60">
+      <div className="animate-rise-delay-1 mt-8 flex items-baseline justify-between">
+        <h1 className="text-2xl font-semibold">Operator setup</h1>
+        <span className="text-xs tabular-nums text-black/50">
+          {done} / {total} ready
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/5">
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-3 text-sm text-black/60">
         Env vars and external accounts needed before sign-in and tracking work.
       </p>
 
-      <ul className="mt-6 space-y-3">
-        {status.checks.map((c) => (
+      <ul className="animate-rise-delay-2 mt-6 space-y-3">
+        {status.checks.map((c, i) => (
           <li
             key={c.id}
-            className={`rounded-md border p-3 text-sm ${
-              c.ok ? "border-emerald-300 bg-emerald-50" : "border-rose-300 bg-rose-50"
+            style={{ animationDelay: `${80 + i * 40}ms` }}
+            className={`animate-rise card-hover rounded-md border p-3 text-sm ${
+              c.ok
+                ? "border-emerald-300 bg-emerald-50"
+                : "border-rose-300 bg-rose-50"
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className={c.ok ? "text-emerald-700" : "text-rose-700"}>
-                {c.ok ? "✓" : "✗"}
+              <span
+                className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${
+                  c.ok
+                    ? "bg-emerald-500 text-white"
+                    : "bg-rose-500 text-white"
+                }`}
+              >
+                {c.ok ? "✓" : "!"}
               </span>
               <span className="font-medium">{c.label}</span>
             </div>
-            <div className="mt-1 text-xs text-black/60">{c.hint}</div>
+            <div className="mt-1 pl-7 text-xs text-black/60">{c.hint}</div>
           </li>
         ))}
       </ul>
