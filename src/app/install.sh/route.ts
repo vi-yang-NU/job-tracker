@@ -68,6 +68,12 @@ function renderInstaller(opts: {
   return `#!/usr/bin/env bash
 set -euo pipefail
 
+# Self-heal a broken cwd. If the user previously \`rm -rf\`d the install dir
+# while their shell was inside it, every command that calls getcwd() (git,
+# npm, ...) will fail with "No such file or directory". Force ourselves into
+# $HOME before doing anything else.
+cd "$HOME" 2>/dev/null || cd /tmp
+
 API_BASE="${origin}"
 REPO="${repo}"
 BRANCH="${branch}"
