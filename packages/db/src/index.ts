@@ -1,8 +1,8 @@
 import { createClient, type Client } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
-import * as schema from "./schema";
+import * as schema from "./schema.js";
 
-export * from "./schema";
+export * from "./schema.js";
 export { schema };
 
 let cachedClient: Client | undefined;

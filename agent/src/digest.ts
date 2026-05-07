@@ -1,4 +1,4 @@
-import type { InboxItem } from "./api";
+import type { InboxItem } from "./api.js";
 
 export interface FormattedNotifications {
   /** Long-form for iMessage. */

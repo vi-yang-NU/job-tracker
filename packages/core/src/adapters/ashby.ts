@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
-import type { SiteAdapter, FetchResult, SimilarPosting } from "../types";
-import { hashContent, looksRemote, tryParseDate } from "../util";
+import type { SiteAdapter, FetchResult, SimilarPosting } from "../types.js";
+import { hashContent, looksRemote, tryParseDate } from "../util.js";
 
 // jobs.ashbyhq.com/<company>/<uuid>
 const RE = /^https?:\/\/jobs\.ashbyhq\.com\/([^/]+)\/([0-9a-f-]+)/i;

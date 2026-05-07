@@ -1,9 +1,9 @@
-import type { SiteAdapter } from "../types";
-import { greenhouse } from "./greenhouse";
-import { lever } from "./lever";
-import { ashby } from "./ashby";
-import { linkedin } from "./linkedin";
-import { generic } from "./generic";
+import type { SiteAdapter } from "../types.js";
+import { greenhouse } from "./greenhouse.js";
+import { lever } from "./lever.js";
+import { ashby } from "./ashby.js";
+import { linkedin } from "./linkedin.js";
+import { generic } from "./generic.js";
 
 const ordered: SiteAdapter[] = [greenhouse, lever, ashby, linkedin, generic];
 

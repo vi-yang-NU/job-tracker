@@ -8,10 +8,11 @@
   ],
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run build:packages && next build",
+    "build:packages": "npm run build --workspace @jobtracker/core --workspace @jobtracker/db",
+    "build:agent": "npm run build:packages && npm run build --workspace agent",
     "start": "next start",
     "lint": "next lint",
-    "build:agent": "npm run build --workspace agent",
     "db:push": "npm run db:push --workspace @jobtracker/db"
   },
   "dependencies": {

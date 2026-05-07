@@ -1,9 +1,9 @@
-import { Api, type RemoteJob } from "./api";
+import { Api, type RemoteJob } from "./api.js";
 import { fetchJob, fetchSimilar, detectAdapter } from "@jobtracker/core";
-import { fetchHtmlWithBrowser, shutdownBrowser } from "./browser";
-import { formatInbox } from "./digest";
-import { iMessage, macNotify } from "./notify";
-import { loadConfig } from "./config";
+import { fetchHtmlWithBrowser, shutdownBrowser } from "./browser.js";
+import { formatInbox } from "./digest.js";
+import { iMessage, macNotify } from "./notify.js";
+import { loadConfig } from "./config.js";
 
 export async function tick() {
   const cfg = loadConfig();

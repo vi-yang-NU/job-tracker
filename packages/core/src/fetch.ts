@@ -1,6 +1,6 @@
-import { detectAdapter } from "./adapters";
-import type { FetchResult, SimilarPosting } from "./types";
-import { canonicalize } from "./util";
+import { detectAdapter } from "./adapters/index.js";
+import type { FetchResult, SimilarPosting } from "./types.js";
+import { canonicalize } from "./util.js";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +

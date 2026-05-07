@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
-import type { SiteAdapter, FetchResult } from "../types";
-import { hashContent, looksRemote, tryParseDate } from "../util";
+import type { SiteAdapter, FetchResult } from "../types.js";
+import { hashContent, looksRemote, tryParseDate } from "../util.js";
 
 /** Last-resort adapter: tries JSON-LD JobPosting then falls back to <title>. */
 export const generic: SiteAdapter = {

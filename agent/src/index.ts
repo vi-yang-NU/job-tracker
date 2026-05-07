@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { tick } from "./tick";
-import { Api } from "./api";
-import { loadConfig } from "./config";
+import { tick } from "./tick.js";
+import { Api } from "./api.js";
+import { loadConfig } from "./config.js";
 
 // Show up as "jobtracker-agent" in macOS Activity Monitor / `ps`, not "node".
 process.title = "jobtracker-agent";
@@ -28,7 +28,7 @@ async function main() {
       break;
     }
     case "welcome": {
-      const { macNotify, iMessage } = await import("./notify");
+      const { macNotify, iMessage } = await import("./notify.js");
       const to = process.env.JOBTRACKER_IMESSAGE_TO;
       const cfg = loadConfig();
       const api = new Api(cfg);

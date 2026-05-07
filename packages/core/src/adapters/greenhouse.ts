@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
-import type { SiteAdapter, FetchResult, SimilarPosting } from "../types";
-import { hashContent, looksRemote, tryParseDate } from "../util";
+import type { SiteAdapter, FetchResult, SimilarPosting } from "../types.js";
+import { hashContent, looksRemote, tryParseDate } from "../util.js";
 
 // boards.greenhouse.io/<company>/jobs/<id>
 //   or job-boards.greenhouse.io/<company>/jobs/<id>

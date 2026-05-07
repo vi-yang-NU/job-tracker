@@ -14,3 +14,6 @@ playwright-report/
 .cache/
 agent/local.db
 agent/.token
+
+# Built workspace packages
+packages/*/dist
