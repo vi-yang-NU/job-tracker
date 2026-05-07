@@ -61,7 +61,7 @@ export default async function Settings() {
               Resume uploaded but not yet parsed. The Mac agent ticks every 3h — fire one now to
               parse this immediately:
             </p>
-            <CopyCommand command="launchctl start com.jobtracker.agent" label="Run agent now" />
+            <CopyCommand command="open -a Ollama; sleep 2; launchctl start com.jobtracker.agent" label="Run agent now" />
             <p className="text-xs text-amber-800/80">
               Then refresh this page. Check timing with{" "}
               <code className="font-mono">node ~/.jobtracker/agent/dist/index.js status</code>.
@@ -106,7 +106,7 @@ export default async function Settings() {
         </p>
         <div className="mt-3 space-y-1.5">
           <div className="text-[11px] uppercase tracking-wide text-black/50">Run a tick now</div>
-          <CopyCommand command="launchctl start com.jobtracker.agent" />
+          <CopyCommand command="open -a Ollama; sleep 2; launchctl start com.jobtracker.agent" />
         </div>
         <div className="mt-3 space-y-1.5">
           <div className="text-[11px] uppercase tracking-wide text-black/50">
