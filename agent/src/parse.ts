@@ -2,12 +2,30 @@ import { ollamaJson } from "./ollama.js";
 
 export type Education = "highschool" | "associate" | "bachelor" | "master" | "phd";
 
+export type RoleType =
+  | "full-time"
+  | "internship"
+  | "part-time"
+  | "contract"
+  | "research"
+  | "other";
+
+export interface Role {
+  title: string;
+  /** "YYYY-MM" or "YYYY". */
+  start: string;
+  /** "YYYY-MM", "YYYY", or "present". */
+  end: string;
+  type: RoleType;
+}
+
 export interface ParsedResume {
   yoe: number;
   education: Education | null;
   skills: string[];
   currentRole: string | null;
   industries: string[];
+  roles: Role[];
 }
 
 export interface ParsedRequirements {
@@ -18,14 +36,24 @@ export interface ParsedRequirements {
   skillsNice: string[];
 }
 
-const RESUME_SYSTEM = `You extract structured data from resumes.
+const RESUME_SYSTEM = `You extract structured data from a resume.
 You ONLY return valid JSON. No prose, no comments, no markdown.
+
 Fields:
-- yoe: number — total years of professional work experience (decimals OK).
-- education: one of highschool|associate|bachelor|master|phd, or null if unclear.
+- roles: array of work roles. For each role return {title, start, end, type}.
+    - start, end: "YYYY-MM" or "YYYY" — use "present" for end if it's the current role.
+    - type: one of "full-time" | "internship" | "part-time" | "contract" | "research" | "other".
+        - Anything labeled "Intern", "Internship", "Co-op", "Summer Analyst" → "internship".
+        - "Research Assistant", "TA", "Graduate Researcher" → "research".
+        - Default to "full-time" only when explicitly full-time / no qualifier and post-graduation.
+        - If unclear, use "other".
+        - Skip volunteering, school clubs, hackathons, side projects.
+- education: one of highschool|associate|bachelor|master|phd, or null if unclear (use the highest completed level).
 - skills: array of lowercase, deduplicated technology / domain keywords (max 30).
 - currentRole: most recent job title, or null.
-- industries: array of broad industries / domains the person has worked in.`;
+- industries: array of broad industries / domains the person has worked in.
+
+Do NOT compute years of experience yourself — just extract the dates accurately.`;
 
 const REQUIREMENTS_SYSTEM = `You extract requirements from a job posting.
 You ONLY return valid JSON. No prose, no comments, no markdown.
@@ -43,13 +71,90 @@ export async function parseResume(text: string): Promise<ParsedResume> {
   const result = await ollamaJson<Partial<ParsedResume>>(`Resume:\n"""\n${trimmed}\n"""`, {
     system: RESUME_SYSTEM,
   });
+  const roles = sanitizeRoles(result.roles);
   return {
-    yoe: numberOrZero(result.yoe),
+    // YoE is computed deterministically from full-time intervals — small models
+    // are bad at multi-step date arithmetic; we trust them only with extraction.
+    yoe: computeYoEFromRoles(roles, new Date()),
     education: validEducation(result.education ?? null),
     skills: arrayOfStrings(result.skills).map((s) => s.toLowerCase()).slice(0, 30),
     currentRole: stringOrNull(result.currentRole),
     industries: arrayOfStrings(result.industries).slice(0, 10),
+    roles,
   };
+}
+
+const VALID_ROLE_TYPES: RoleType[] = [
+  "full-time",
+  "internship",
+  "part-time",
+  "contract",
+  "research",
+  "other",
+];
+
+function sanitizeRoles(v: unknown): Role[] {
+  if (!Array.isArray(v)) return [];
+  const out: Role[] = [];
+  for (const r of v) {
+    if (!r || typeof r !== "object") continue;
+    const obj = r as Record<string, unknown>;
+    const title = stringOrNull(obj.title);
+    const start = stringOrNull(obj.start);
+    const end = stringOrNull(obj.end);
+    if (!title || !start || !end) continue;
+    const typeRaw = typeof obj.type === "string" ? obj.type.toLowerCase() : "other";
+    const type = (VALID_ROLE_TYPES as string[]).includes(typeRaw)
+      ? (typeRaw as RoleType)
+      : "other";
+    out.push({ title, start, end, type });
+  }
+  return out;
+}
+
+/** Parse "YYYY-MM" or "YYYY" or "present" into a Date (UTC). null on failure. */
+function parseRoleDate(s: string, now: Date): Date | null {
+  const v = s.trim().toLowerCase();
+  if (v === "present" || v === "current" || v === "now") return now;
+  const ym = /^(\d{4})-(\d{1,2})$/.exec(v);
+  if (ym) {
+    const y = Number(ym[1]);
+    const m = Number(ym[2]);
+    if (m < 1 || m > 12) return null;
+    return new Date(Date.UTC(y, m - 1, 1));
+  }
+  const y = /^(\d{4})$/.exec(v);
+  if (y) return new Date(Date.UTC(Number(y[1]), 0, 1));
+  return null;
+}
+
+/**
+ * Sum continuous full-time intervals; ignore overlaps. Internships, research,
+ * contract, part-time roles do NOT contribute. This matches what most job
+ * postings mean by "X years of experience."
+ */
+export function computeYoEFromRoles(roles: Role[], now: Date): number {
+  const intervals: Array<[number, number]> = [];
+  for (const r of roles) {
+    if (r.type !== "full-time") continue;
+    const start = parseRoleDate(r.start, now);
+    const end = parseRoleDate(r.end, now);
+    if (!start || !end) continue;
+    if (end.getTime() <= start.getTime()) continue;
+    intervals.push([start.getTime(), end.getTime()]);
+  }
+  intervals.sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [];
+  for (const [s, e] of intervals) {
+    const last = merged[merged.length - 1];
+    if (last && s <= last[1]) {
+      last[1] = Math.max(last[1], e);
+    } else {
+      merged.push([s, e]);
+    }
+  }
+  const totalMs = merged.reduce((sum, [s, e]) => sum + (e - s), 0);
+  return round(totalMs / (365 * 86400_000), 1);
 }
 
 export async function parseRequirements(

@@ -248,6 +248,18 @@ export const resumes = sqliteTable("resumes", {
     skills?: string[];
     currentRole?: string | null;
     industries?: string[];
+    roles?: Array<{
+      title: string;
+      start: string;
+      end: string;
+      type:
+        | "full-time"
+        | "internship"
+        | "part-time"
+        | "contract"
+        | "research"
+        | "other";
+    }>;
   }>(),
   parsedAt: integer("parsed_at", { mode: "timestamp_ms" }),
   /**

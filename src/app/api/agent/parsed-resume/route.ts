@@ -10,6 +10,23 @@ const schemaIn = z.object({
   skills: z.array(z.string()),
   currentRole: z.string().nullable(),
   industries: z.array(z.string()),
+  roles: z
+    .array(
+      z.object({
+        title: z.string(),
+        start: z.string(),
+        end: z.string(),
+        type: z.enum([
+          "full-time",
+          "internship",
+          "part-time",
+          "contract",
+          "research",
+          "other",
+        ]),
+      })
+    )
+    .optional(),
 });
 
 export async function POST(req: Request) {
@@ -30,6 +47,7 @@ export async function POST(req: Request) {
         skills: parsed.data.skills,
         currentRole: parsed.data.currentRole,
         industries: parsed.data.industries,
+        roles: parsed.data.roles,
       },
       parsedAt: new Date(),
     })

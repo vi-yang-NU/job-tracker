@@ -44,31 +44,78 @@ export default async function Settings() {
         </p>
 
         {parsed ? (
-          <div className="mt-4 grid grid-cols-2 gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
-            <Stat label="Years of experience" value={`${parsed.yoe ?? 0}y`} />
-            <Stat
-              label="Effective YoE today"
-              value={effectiveYoe ? `${effectiveYoe.toFixed(1)}y` : "—"}
-              hint={ageDays !== null ? `resume ${ageDays}d old` : undefined}
-            />
-            <Stat label="Education" value={parsed.education ?? "—"} />
-            <Stat label="Skills" value={`${parsed.skills?.length ?? 0}`} />
-            {parsed.currentRole ? (
-              <Stat label="Current role" value={parsed.currentRole} className="col-span-2" />
+          <div className="mt-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
+              <Stat
+                label="Years of experience"
+                value={`${parsed.yoe ?? 0}y`}
+                hint="full-time only"
+              />
+              <Stat
+                label="Effective YoE today"
+                value={effectiveYoe ? `${effectiveYoe.toFixed(1)}y` : "—"}
+                hint={ageDays !== null ? `resume ${ageDays}d old` : undefined}
+              />
+              <Stat label="Education" value={parsed.education ?? "—"} />
+              <Stat label="Skills" value={`${parsed.skills?.length ?? 0}`} />
+              {parsed.currentRole ? (
+                <Stat label="Current role" value={parsed.currentRole} className="col-span-2" />
+              ) : null}
+            </div>
+
+            {parsed.roles && parsed.roles.length > 0 ? (
+              <details className="rounded-md border border-black/10 bg-white p-3 text-xs">
+                <summary className="cursor-pointer select-none font-medium text-black/70">
+                  How we computed your YoE ({parsed.roles.length} role
+                  {parsed.roles.length === 1 ? "" : "s"} extracted)
+                </summary>
+                <p className="mt-2 text-[11px] text-black/60">
+                  Only <strong>full-time</strong> intervals count toward YoE. Internships,
+                  research, contracts, and part-time roles are tracked but excluded — that's what
+                  most "X years of experience" requirements actually mean.
+                </p>
+                <ul className="mt-2 divide-y divide-black/5">
+                  {parsed.roles.map((r, i) => {
+                    const counted = r.type === "full-time";
+                    return (
+                      <li key={i} className="flex items-center justify-between gap-2 py-1.5">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium text-black/80">{r.title}</div>
+                          <div className="text-[11px] text-black/50">
+                            {r.start} → {r.end}
+                          </div>
+                        </div>
+                        <span
+                          className={`pill ${
+                            counted
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-black/[0.06] text-black/50"
+                          }`}
+                        >
+                          {r.type}
+                          {counted ? " · counted" : " · not counted"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
             ) : null}
           </div>
         ) : resume?.rawText ? (
           <div className="mt-4 space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <p>
-              Resume uploaded but not yet parsed. The Mac agent ticks every 3h — fire one now to
-              parse this immediately:
+              Resume uploaded but not yet parsed. Paste this in your terminal — it runs the agent
+              live so you see what's happening:
             </p>
-            <CopyCommand command="open -a Ollama; sleep 2; launchctl start com.jobtracker.agent" label="Run agent now" />
+            <CopyCommand
+              command="open -a Ollama; sleep 2; cd ~/.jobtracker/agent && node dist/index.js tick"
+              label="Run agent now (live output)"
+            />
             <p className="text-xs text-amber-800/80">
-              Then refresh this page. Check timing with{" "}
-              <code className="font-mono">node ~/.jobtracker/agent/dist/index.js status</code>.
-              Make sure Ollama is running (<code>brew services start ollama</code>) and{" "}
-              <code>llama3.1:8b</code> + <code>nomic-embed-text</code> are pulled.
+              Watch for <code>[parse] resume parsed: yoe=…</code> — that's success. Then refresh
+              this page. Make sure <code>llama3.2:3b</code> and <code>nomic-embed-text</code> are
+              pulled (<code>ollama list</code>).
             </p>
           </div>
         ) : (
@@ -107,7 +154,15 @@ export default async function Settings() {
           jobs, fire a tick now instead of waiting:
         </p>
         <div className="mt-3 space-y-1.5">
-          <div className="text-[11px] uppercase tracking-wide text-black/50">Run a tick now</div>
+          <div className="text-[11px] uppercase tracking-wide text-black/50">
+            Run a tick now (live output in terminal)
+          </div>
+          <CopyCommand command="open -a Ollama; sleep 2; cd ~/.jobtracker/agent && node dist/index.js tick" />
+        </div>
+        <div className="mt-3 space-y-1.5">
+          <div className="text-[11px] uppercase tracking-wide text-black/50">
+            Or fire a background tick via launchd (silent — output → log file)
+          </div>
           <CopyCommand command="open -a Ollama; sleep 2; launchctl start com.jobtracker.agent" />
         </div>
         <div className="mt-3 space-y-1.5">

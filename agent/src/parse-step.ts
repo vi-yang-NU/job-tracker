@@ -53,8 +53,12 @@ export async function runParseStep(api: Api): Promise<void> {
         skills: r.skills,
         currentRole: r.currentRole,
         industries: r.industries,
+        roles: r.roles,
       });
-      console.log(`[parse] resume parsed: yoe=${r.yoe}, ${r.skills.length} skills`);
+      const ftCount = r.roles.filter((x) => x.type === "full-time").length;
+      console.log(
+        `[parse] resume parsed: yoe=${r.yoe} (from ${ftCount} full-time of ${r.roles.length} roles), ${r.skills.length} skills`
+      );
 
       // Build RAG chunks from the same raw text. ~2-3s for a typical resume.
       try {
@@ -89,6 +93,7 @@ export async function runParseStep(api: Api): Promise<void> {
     skills: serverResume.skills,
     currentRole: serverResume.currentRole,
     industries: serverResume.industries,
+    roles: [],
   };
 
   // If we don't have local chunks (resume wasn't in this tick's queue), we

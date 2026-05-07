@@ -96,6 +96,7 @@ export class Api {
     skills: string[];
     currentRole: string | null;
     industries: string[];
+    roles?: Array<{ title: string; start: string; end: string; type: string }>;
   }) {
     return this.req<{ ok: boolean }>("/api/agent/parsed-resume", {
       method: "POST",
