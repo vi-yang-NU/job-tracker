@@ -4,7 +4,7 @@ A multi-tenant job tracker. Hosted dashboard on Vercel; an optional Mac agent ru
 
 ```
 ┌──────────────────────────┐         ┌──────────────────────────┐
-│ web/  (Next.js, Vercel)  │ ◄─────► │ Turso (libSQL)           │
+│ Next.js (Vercel, root)   │ ◄─────► │ Turso (libSQL)           │
 │  • Google sign-in         │         │  users / portfolios /    │
 │  • Portfolios + map UI    │         │  jobs / snapshots /      │
 │  • Status incl. "watching"│         │  similar_jobs / tokens   │
@@ -45,7 +45,7 @@ Use this for cohorted programs (internships, fellowships, returnships) that have
 
 | Path | What |
 | --- | --- |
-| `web/` | Next.js 15 app — deploys to Vercel |
+| `src/`, `next.config.mjs`, `package.json` | Next.js 15 app at the repo root — deploys to Vercel with zero dashboard config |
 | `agent/` | Node CLI that users install on their Mac |
 | `packages/db/` | Drizzle schema + libSQL client |
 | `packages/core/` | Site adapters + shared fetch helpers |
@@ -63,15 +63,11 @@ Use this for cohorted programs (internships, fellowships, returnships) that have
 4. **Local install + push schema:**
    ```bash
    npm install
-   cp web/.env.example web/.env.local      # fill in values
+   cp .env.example .env.local              # fill in values
    TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... npm run db:push
-   npm run dev:web
+   npm run dev
    ```
-5. **Deploy to Vercel:**
-   ```bash
-   cd web && vercel
-   ```
-   Set env vars in the Vercel dashboard:
+5. **Deploy to Vercel:** Import the GitHub repo in Vercel — it auto-detects Next.js at the repo root, no Root Directory override needed. Then set env vars in **Settings → Environment Variables**:
    - `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
    - `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `NEXTAUTH_URL`
    - `CRON_SECRET` (any random string — gates the cron endpoints)
