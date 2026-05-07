@@ -33,6 +33,17 @@ const itemSchema = z.object({
       })
       .optional(),
     unlockAt: z.string().datetime().nullable().optional(),
+    evidence: z
+      .array(
+        z.object({
+          skill: z.string(),
+          required: z.boolean(),
+          covered: z.boolean(),
+          confidence: z.enum(["high", "medium", "low"]),
+          quote: z.string().optional(),
+        })
+      )
+      .optional(),
   }),
 });
 
@@ -94,6 +105,7 @@ export async function POST(req: Request) {
         jobId: item.jobId,
         status: item.eligibility.status,
         gaps: item.eligibility.gaps ?? null,
+        evidence: item.eligibility.evidence ?? null,
         unlockAt: item.eligibility.unlockAt ? new Date(item.eligibility.unlockAt) : null,
         computedAt: now,
       })
@@ -102,6 +114,7 @@ export async function POST(req: Request) {
         set: {
           status: item.eligibility.status,
           gaps: item.eligibility.gaps ?? null,
+          evidence: item.eligibility.evidence ?? null,
           unlockAt: item.eligibility.unlockAt ? new Date(item.eligibility.unlockAt) : null,
           computedAt: now,
         },

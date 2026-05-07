@@ -84,13 +84,29 @@ All LLM work runs **locally on your Mac via Ollama**. Your resume text never
 leaves your machine after the initial upload — Vercel only stores the
 structured snapshot (years, skills, education).
 
-**Install Ollama before running the agent installer:**
+**Install Ollama and pull two models before running the agent installer:**
 
 ```bash
 brew install ollama
-brew services start ollama        # runs on boot
-ollama pull llama3.1:8b           # ~4.7GB, one-time
+brew services start ollama         # runs on boot
+
+# generation model — extracts structure, verifies skills
+ollama pull llama3.1:8b            # ~4.7GB
+
+# embedding model — needed for RAG-grounded skill matching
+ollama pull nomic-embed-text       # ~270MB
 ```
+
+Smaller LLMs hallucinate skills. We don't. Each "ready" eligibility is backed
+by an actual quoted line from your resume — the agent embeds the resume, does
+cosine top-k against each required skill, and asks Ollama a grounded yes/no
+that includes the supporting quote. Click any eligibility pill on the
+dashboard to see exactly which excerpts backed each ✓ or ✗.
+
+If you have a different model, set `OLLAMA_MODEL` (generation) and/or
+`OLLAMA_EMBED_MODEL` (embeddings) in `~/.jobtracker/agent/.env`. Anything
+that supports `format: "json"` works for generation; for embeddings we need
+a model exposed via Ollama's `/api/embeddings` endpoint.
 
 After that:
 1. Open `/settings` on the deployed site → paste resume text → Save.

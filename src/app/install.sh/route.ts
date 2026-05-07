@@ -94,7 +94,11 @@ done
 # it's missing — install proceeds either way.
 if ! command -v ollama >/dev/null 2>&1; then
   echo "ⓘ  Ollama not found — resume + eligibility analysis will be skipped."
-  echo "   To enable: brew install ollama && brew services start ollama && ollama pull llama3.1:8b"
+  echo "   To enable:"
+  echo "     brew install ollama"
+  echo "     brew services start ollama"
+  echo "     ollama pull llama3.1:8b        # generation"
+  echo "     ollama pull nomic-embed-text   # embeddings (RAG)"
 fi
 
 if [ -d "$INSTALL_DIR/.git" ]; then
@@ -152,7 +156,8 @@ fi
   fi
   echo "# Ollama settings (defaults assume \\\`brew install ollama\\\` is running locally)"
   echo "# OLLAMA_BASE=http://localhost:11434"
-  echo "# OLLAMA_MODEL=llama3.1:8b"
+  echo "# OLLAMA_MODEL=llama3.1:8b              # generation"
+  echo "# OLLAMA_EMBED_MODEL=nomic-embed-text   # embeddings (RAG)"
 } > "$INSTALL_DIR/agent/.env"
 
 ( cd "$INSTALL_DIR/agent" && npx playwright install chromium >/dev/null 2>&1 ) || true

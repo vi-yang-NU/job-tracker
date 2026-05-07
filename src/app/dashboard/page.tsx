@@ -4,6 +4,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import Link from "next/link";
 import AddJobForm from "./AddJobForm";
 import MapWrapper from "./MapWrapper";
+import EligibilityDetail from "./EligibilityDetail";
 import { updateJobAction, removeJobAction } from "./actions";
 
 const STATUS_OPTIONS = [
@@ -286,37 +287,37 @@ function EligibilityPill({
   eligibility: typeof schema.eligibility.$inferSelect | null;
 }) {
   if (!eligibility) return null;
-  const { status, gaps, unlockAt } = eligibility;
+  const { status, gaps, unlockAt, evidence } = eligibility;
+
+  let label: string;
   if (status === "ready") {
-    return <span className="pill bg-emerald-200 text-emerald-900" title="Ready to apply">✓ ready</span>;
-  }
-  if (status === "stretch") {
+    label = "✓ ready";
+  } else if (status === "stretch") {
     const missing = gaps?.missingSkills?.length ?? 0;
-    return (
-      <span
-        className="pill bg-amber-100 text-amber-900"
-        title={gaps?.reason ?? "Some gaps — may apply with tailoring"}
-      >
-        ◐ stretch{missing > 0 ? ` · -${missing} skill${missing === 1 ? "" : "s"}` : ""}
-      </span>
-    );
-  }
-  if (status === "future") {
+    label =
+      missing > 0
+        ? `◐ stretch · -${missing} skill${missing === 1 ? "" : "s"}`
+        : "◐ stretch";
+  } else if (status === "future") {
     const months =
       unlockAt && unlockAt.getTime() > Date.now()
         ? Math.max(1, Math.round((unlockAt.getTime() - Date.now()) / (30 * 86400_000)))
         : 0;
     const yoe = gaps?.missingYoe ? `${gaps.missingYoe.toFixed(1)}y` : `${months}mo`;
-    return (
-      <span
-        className="pill bg-violet-100 text-violet-900"
-        title={`Needs ${yoe} more experience`}
-      >
-        ◑ +{yoe}
-      </span>
-    );
+    label = `◑ +${yoe}`;
+  } else {
+    label = "— unscored";
   }
-  return <span className="pill bg-black/10 text-black/60">— unscored</span>;
+
+  return (
+    <EligibilityDetail
+      status={status}
+      label={label}
+      evidence={evidence ?? null}
+      gaps={gaps ?? null}
+      unlockAt={unlockAt ?? null}
+    />
+  );
 }
 
 function ResumeUploadBanner() {

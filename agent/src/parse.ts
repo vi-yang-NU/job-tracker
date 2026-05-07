@@ -95,22 +95,26 @@ export interface EligibilityResult {
   unlockAt?: Date;
 }
 
+export interface SkillCheck {
+  skill: string;
+  required: boolean;
+  covered: boolean;
+}
+
 /**
- * Compute eligibility purely from parsed structures + the user's effective YoE.
- * `effectiveYoe` is the resume YoE plus time elapsed since the user last
- * confirmed the resume reflects current state.
+ * Compute eligibility from parsed structures + per-skill RAG verifications.
  *
  * Status definitions:
- *  - ready:   YoE + edu + every required skill clear
- *  - stretch: YoE clears, edu clears, but some required skills missing — user
- *             may be able to apply with a tailored resume / adjacent skills
+ *  - ready:   YoE + edu + every required skill verified
+ *  - stretch: YoE + edu clear, some required skills missing — user can craft
  *  - future:  YoE gap (closes with time). unlockAt = today + (gap years)
- *  - unknown: required to evaluate but missing data
+ *  - unknown: missing data we need to score
  */
 export function evaluateEligibility(
   resume: ParsedResume,
   reqs: ParsedRequirements,
-  effectiveYoe: number
+  effectiveYoe: number,
+  skillChecks?: SkillCheck[]
 ): EligibilityResult {
   const yoeOk = effectiveYoe >= reqs.yoeMin;
   const eduOk =
@@ -118,8 +122,17 @@ export function evaluateEligibility(
     !resume.education ||
     EDU_LEVEL[resume.education] >= EDU_LEVEL[reqs.educationRequired];
 
-  const haveSkills = new Set(resume.skills.map((s) => s.toLowerCase()));
-  const missingSkills = reqs.skillsRequired.filter((s) => !skillCovered(s, haveSkills));
+  // Prefer RAG-verified skill coverage; fall back to keyword matching when
+  // no verifications were supplied (e.g. embeddings unavailable).
+  let missingSkills: string[];
+  if (skillChecks && skillChecks.length > 0) {
+    missingSkills = skillChecks
+      .filter((c) => c.required && !c.covered)
+      .map((c) => c.skill);
+  } else {
+    const haveSkills = new Set(resume.skills.map((s) => s.toLowerCase()));
+    missingSkills = reqs.skillsRequired.filter((s) => !skillCovered(s, haveSkills));
+  }
   const skillsOk = missingSkills.length === 0;
 
   if (yoeOk && eduOk && skillsOk) {

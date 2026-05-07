@@ -280,6 +280,21 @@ export const eligibility = sqliteTable(
       missingEducation?: string;
       reason?: string;
     }>(),
+    /**
+     * Per-skill RAG verifications. The agent does cosine top-k on the user's
+     * resume chunks for each required skill, then asks the LLM a grounded
+     * yes/no with a quoted excerpt. Cached so the dashboard can show the
+     * actual resume line that backed each "ready".
+     */
+    evidence: text("evidence", { mode: "json" }).$type<
+      Array<{
+        skill: string;
+        covered: boolean;
+        confidence: "high" | "medium" | "low";
+        quote?: string;
+        required: boolean;
+      }>
+    >(),
     /** For status='future': when the user's YoE will satisfy the requirement. */
     unlockAt: integer("unlock_at", { mode: "timestamp_ms" }),
     computedAt: integer("computed_at", { mode: "timestamp_ms" })
