@@ -2,6 +2,7 @@
 import { tick } from "./tick.js";
 import { Api } from "./api.js";
 import { loadConfig } from "./config.js";
+import { readLastTick } from "./state.js";
 
 // Show up as "jobtracker-agent" in macOS Activity Monitor / `ps`, not "node".
 process.title = "jobtracker-agent";
@@ -55,12 +56,35 @@ async function main() {
       }
       break;
     }
+    case "status": {
+      const state = readLastTick();
+      if (!state) {
+        console.log("Agent has never completed a tick on this machine.");
+        console.log("Trigger one now:  launchctl start com.jobtracker.agent");
+        break;
+      }
+      const ranAt = new Date(state.ranAt);
+      const nextAt = new Date(ranAt.getTime() + state.intervalSec * 1000);
+      const sinceMs = Date.now() - ranAt.getTime();
+      const untilMs = nextAt.getTime() - Date.now();
+      console.log(`Last tick:  ${formatRelative(sinceMs)} ago  (${ranAt.toLocaleString()})`);
+      if (untilMs <= 0) {
+        console.log(
+          `Next tick:  overdue by ${formatRelative(-untilMs)} — launchd will fire on next wake`
+        );
+      } else {
+        console.log(`Next tick:  in ${formatRelative(untilMs)}  (${nextAt.toLocaleString()})`);
+      }
+      console.log(`Run now:    launchctl start com.jobtracker.agent`);
+      break;
+    }
     case "help":
     default:
       console.log(`jobtracker agent
 
 Commands:
   tick     Fetch all tracked jobs, post results, then deliver inbox. (default)
+  status   Show when the agent last ran and when it'll run next.
   whoami   Verify the agent token.
   inbox    Print pending notifications without delivering them.
   welcome  Send a one-time welcome notification (used by the installer).
@@ -74,6 +98,16 @@ Env:
 `);
       if (cmd !== "help") process.exit(1);
   }
+}
+
+function formatRelative(ms: number): string {
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
 main().catch((err) => {

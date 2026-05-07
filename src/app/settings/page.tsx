@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/session";
 import { db } from "@/lib/db";
 import { saveResumeAction, refreshResumeDateAction } from "./actions";
+import CopyCommand from "./CopyCommand";
 
 export default async function Settings() {
   const { userId } = await requireUser();
@@ -55,10 +56,18 @@ export default async function Settings() {
             ) : null}
           </div>
         ) : resume?.rawText ? (
-          <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            Resume uploaded but not yet parsed. Run the Mac agent — it'll process it on the next
-            tick. Make sure Ollama is running (<code>brew services start ollama</code>) and the
-            chosen model is pulled (<code>ollama pull llama3.1:8b</code>).
+          <div className="mt-4 space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <p>
+              Resume uploaded but not yet parsed. The Mac agent ticks every 3h — fire one now to
+              parse this immediately:
+            </p>
+            <CopyCommand command="launchctl start com.jobtracker.agent" label="Run agent now" />
+            <p className="text-xs text-amber-800/80">
+              Then refresh this page. Check timing with{" "}
+              <code className="font-mono">node ~/.jobtracker/agent/dist/index.js status</code>.
+              Make sure Ollama is running (<code>brew services start ollama</code>) and{" "}
+              <code>llama3.1:8b</code> + <code>nomic-embed-text</code> are pulled.
+            </p>
           </div>
         ) : (
           <p className="mt-4 text-xs text-black/60">No resume on file yet.</p>
@@ -87,6 +96,28 @@ export default async function Settings() {
             </p>
           </form>
         ) : null}
+      </section>
+
+      <section className="animate-rise-delay-3 card-hover rounded-lg border border-black/10 bg-white p-5">
+        <h2 className="text-lg font-semibold">Mac agent</h2>
+        <p className="mt-1 text-sm text-black/60">
+          The agent runs on a 3-hour <code>launchd</code> timer. After saving a resume or adding
+          jobs, fire a tick now instead of waiting:
+        </p>
+        <div className="mt-3 space-y-1.5">
+          <div className="text-[11px] uppercase tracking-wide text-black/50">Run a tick now</div>
+          <CopyCommand command="launchctl start com.jobtracker.agent" />
+        </div>
+        <div className="mt-3 space-y-1.5">
+          <div className="text-[11px] uppercase tracking-wide text-black/50">
+            Check last / next tick
+          </div>
+          <CopyCommand command="node ~/.jobtracker/agent/dist/index.js status" />
+        </div>
+        <div className="mt-3 space-y-1.5">
+          <div className="text-[11px] uppercase tracking-wide text-black/50">Watch live logs</div>
+          <CopyCommand command="tail -f ~/.jobtracker/agent.log" />
+        </div>
       </section>
     </div>
   );

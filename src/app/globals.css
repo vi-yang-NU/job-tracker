@@ -82,6 +82,9 @@ textarea:focus-visible {
   .animate-rise-delay-2 {
     animation: rise 320ms 120ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+  .animate-rise-delay-3 {
+    animation: rise 320ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
   .animate-fade {
     animation: fade 200ms ease-out both;
   }

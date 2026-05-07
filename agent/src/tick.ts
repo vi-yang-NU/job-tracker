@@ -5,8 +5,17 @@ import { formatInbox } from "./digest.js";
 import { iMessage, macNotify } from "./notify.js";
 import { loadConfig } from "./config.js";
 import { runParseStep } from "./parse-step.js";
+import { writeLastTick } from "./state.js";
 
 export async function tick() {
+  try {
+    await runTick();
+  } finally {
+    writeLastTick();
+  }
+}
+
+async function runTick() {
   const cfg = loadConfig();
   const api = new Api(cfg);
   const iMessageTo = process.env.JOBTRACKER_IMESSAGE_TO;
