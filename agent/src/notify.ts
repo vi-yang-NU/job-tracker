@@ -1,19 +1,38 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import notifier from "node-notifier";
 
 const exec = promisify(execFile);
 
-/** Native macOS notification (top-right banner). */
-export async function macNotify(title: string, message: string): Promise<void> {
-  if (process.platform !== "darwin") return;
-  const safeTitle = escapeForOsa(title);
-  const safeMsg = escapeForOsa(message);
-  await exec("osascript", [
-    "-e",
-    `display notification "${safeMsg}" with title "${safeTitle}"`,
-  ]).catch((err) => {
-    console.error(`[notify] macNotify failed: ${(err as Error).message}`);
-  });
+/** Cross-platform desktop notification. */
+export async function notify(title: string, message: string): Promise<void> {
+  if (process.platform === "darwin") {
+    const safeTitle = escapeForOsa(title);
+    const safeMsg = escapeForOsa(message);
+    await exec("osascript", [
+      "-e",
+      `display notification "${safeMsg}" with title "${safeTitle}"`,
+    ]).catch((err) => {
+      console.error(`[notify] mac notification failed: ${(err as Error).message}`);
+    });
+    return;
+  }
+
+  if (process.platform === "win32") {
+    await new Promise<void>((resolve) => {
+      notifier.notify(
+        {
+          title,
+          message,
+          wait: false,
+          sound: false,
+        },
+        () => resolve()
+      );
+    }).catch((err) => {
+      console.error(`[notify] windows notification failed: ${(err as Error).message}`);
+    });
+  }
 }
 
 export interface IMessageResult {

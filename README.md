@@ -1,6 +1,6 @@
 # job-tracker
 
-A multi-tenant job tracker. Hosted dashboard on Vercel; an optional Mac agent runs locally and sends you iMessage / macOS notifications **only when something has actually changed**.
+A multi-tenant job tracker. Hosted dashboard on Vercel; optional Mac and Windows agents run locally and send you desktop notifications **only when something has actually changed**.
 
 ```
 ┌──────────────────────────┐         ┌──────────────────────────┐
@@ -13,7 +13,7 @@ A multi-tenant job tracker. Hosted dashboard on Vercel; an optional Mac agent ru
              │ REST + bearer token               │
              ▼                                   ▼
      ┌────────────────────────────────────────────────┐
-     │ agent/  (Mac CLI, runs via launchd every 3h)   │
+       │ agent/  (Mac / Windows CLI, runs every 3h)    │
      │  • Pulls user's tracked URLs                   │
    │  • Scrapy for fast non-browser HTML fetches    │
    │  • Playwright for LinkedIn / Workday           │
@@ -47,7 +47,7 @@ Use this for cohorted programs (internships, fellowships, returnships) that have
 | Path | What |
 | --- | --- |
 | `src/`, `next.config.mjs`, `package.json` | Next.js 15 app at the repo root — deploys to Vercel with zero dashboard config |
-| `agent/` | Node CLI that users install on their Mac |
+| `agent/` | Node CLI that users install on their Mac or Windows machine |
 | `scraper/` | Optional Scrapy sidecar for HTML fetching |
 | `packages/db/` | Drizzle schema + libSQL client |
 | `packages/core/` | Site adapters + shared fetch helpers |
@@ -69,7 +69,7 @@ Use this for cohorted programs (internships, fellowships, returnships) that have
    TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... npm run db:push
    npm run dev
    ```
-   If you want the Scrapy fetch path in the Mac agent, install the Python dependency once:
+   If you want the Scrapy fetch path in the desktop agent, install the Python dependency once:
    ```bash
    python -m pip install -r scraper/requirements.txt
    ```
@@ -129,17 +129,23 @@ Anything that supports `format: "json"` works — `gemma2:2b`, `qwen2.5:7b`, etc
 
 1. Sign in with Google.
 2. Create a portfolio (e.g., "NYC startups", "2027 internships").
-3. Paste job URLs. The web fetches what it can statically (Greenhouse / Lever / Ashby / generic JSON-LD). The Mac agent uses Scrapy for faster, more resilient non-browser fetching, and still falls back to Playwright for JS-heavy sites.
+3. Paste job URLs. The web fetches what it can statically (Greenhouse / Lever / Ashby / generic JSON-LD). The desktop agent uses Scrapy for faster, more resilient non-browser fetching, and still falls back to Playwright for JS-heavy sites.
 4. Optionally set status + target apply date per job.
-5. **Optional Mac agent** — open `/agent` on the deployed site, mint a token, run:
+5. **Optional desktop agent** — open `/agent` on the deployed site, mint a token, then run the installer that matches your OS:
    ```bash
    curl -fsSL https://YOUR-DOMAIN.vercel.app/install.sh | bash
    ```
-   Paths default to `~/.jobtracker` but honor `$JOBTRACKER_HOME` if you want to relocate. To enable iMessage delivery, set `JOBTRACKER_IMESSAGE_TO=+15555550123` in `~/.jobtracker/agent/.env`.
+   On Windows, run:
+   ```powershell
+   irm https://YOUR-DOMAIN.vercel.app/install.ps1 | iex
+   ```
+   Paths default to `~/.jobtracker` on macOS and `%USERPROFILE%\.jobtracker` on Windows, and both installers honor `JOBTRACKER_HOME` if you want to relocate. To enable iMessage delivery, set `JOBTRACKER_IMESSAGE_TO=+15555550123` in the agent env file on macOS.
 
 ### Why agent runs are coalesced on boot
 
-The launchd plist uses `RunAtLoad=true` + `StartInterval=10800`. While the Mac is asleep / off, no `StartInterval` firings stack up — macOS just runs the agent **once** when the laptop wakes (via `RunAtLoad`), then resumes every-3-hour ticks. Exactly the "aggregate while off, single check on next boot" behavior.
+On macOS, the launchd plist uses `RunAtLoad=true` + `StartInterval=10800`. While the Mac is asleep / off, no `StartInterval` firings stack up — macOS just runs the agent **once** when the laptop wakes (via `RunAtLoad`), then resumes every-3-hour ticks.
+
+On Windows, the installer creates a scheduled task that runs every 3 hours under the current user so the agent keeps working after logon and across reboots.
 
 ## Adapters
 
@@ -164,4 +170,11 @@ Adding an adapter: implement `SiteAdapter` in [`packages/core/src/adapters/`](pa
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.jobtracker.agent.plist
 rm -rf "${JOBTRACKER_HOME:-$HOME/.jobtracker}" ~/Library/LaunchAgents/com.jobtracker.agent.plist
+```
+
+Windows uninstall:
+
+```powershell
+Unregister-ScheduledTask -TaskName jobtracker-agent -Confirm:$false
+Remove-Item -Recurse -Force "$env:USERPROFILE\.jobtracker"
 ```

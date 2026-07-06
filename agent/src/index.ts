@@ -4,7 +4,7 @@ import { Api } from "./api.js";
 import { loadConfig } from "./config.js";
 import { readLastTick } from "./state.js";
 
-// Show up as "jobtracker-agent" in macOS Activity Monitor / `ps`, not "node".
+// Show up as "jobtracker-agent" in process lists, not "node".
 process.title = "jobtracker-agent";
 
 async function main() {
@@ -29,7 +29,7 @@ async function main() {
       break;
     }
     case "welcome": {
-      const { macNotify, iMessage } = await import("./notify.js");
+      const { notify, iMessage } = await import("./notify.js");
       const to = process.env.JOBTRACKER_IMESSAGE_TO;
       const cfg = loadConfig();
       const api = new Api(cfg);
@@ -37,11 +37,11 @@ async function main() {
       const greeting = me?.name ? `Welcome, ${me.name}!` : "Welcome to jobtracker!";
       const body =
         "Agent installed. You'll get pings here when a tracked job opens, gets a deadline, or disappears.";
-      await macNotify(greeting, body);
-      console.log("[welcome] macOS notification sent");
+      await notify(greeting, body);
+      console.log("[welcome] desktop notification sent");
       if (!to) {
         console.log(
-          "[welcome] iMessage skipped — set JOBTRACKER_IMESSAGE_TO in ~/.jobtracker/agent/.env to enable"
+          "[welcome] iMessage skipped — set JOBTRACKER_IMESSAGE_TO in the agent env file to enable"
         );
       } else {
         const r = await iMessage(`${greeting} ${body}`, to);
@@ -50,7 +50,7 @@ async function main() {
         } else {
           console.log(`[welcome] iMessage to ${to} failed: ${r.reason}`);
           console.log(
-            "  If macOS asked for Automation permission, approve in System Settings → Privacy & Security → Automation, then re-run \`node dist/index.js welcome\`."
+            "  On macOS, approve the Automation prompt in System Settings → Privacy & Security → Automation, then re-run `node dist/index.js welcome`."
           );
         }
       }
@@ -60,7 +60,11 @@ async function main() {
       const state = readLastTick();
       if (!state) {
         console.log("Agent has never completed a tick on this machine.");
-        console.log("Trigger one now:  launchctl start com.jobtracker.agent");
+        console.log(
+          process.platform === "win32"
+            ? 'Trigger one now:  Start-ScheduledTask -TaskName "jobtracker-agent"'
+            : "Trigger one now:  launchctl start com.jobtracker.agent"
+        );
         break;
       }
       const ranAt = new Date(state.ranAt);
@@ -75,7 +79,11 @@ async function main() {
       } else {
         console.log(`Next tick:  in ${formatRelative(untilMs)}  (${nextAt.toLocaleString()})`);
       }
-      console.log(`Run now:    launchctl start com.jobtracker.agent`);
+      console.log(
+        process.platform === "win32"
+          ? 'Run now:    Start-ScheduledTask -TaskName "jobtracker-agent"'
+          : "Run now:    launchctl start com.jobtracker.agent"
+      );
       break;
     }
     case "help":
@@ -94,7 +102,7 @@ Env:
   JOBTRACKER_TOKEN         Bearer token (or use JOBTRACKER_TOKEN_FILE)
   JOBTRACKER_TOKEN_FILE    Path to a file holding the token
   JOBTRACKER_IMESSAGE_TO   Phone number / Apple ID for iMessage delivery
-                           (omit to use macOS notifications only)
+                           (macOS only; omit to use desktop notifications)
 `);
       if (cmd !== "help") process.exit(1);
   }

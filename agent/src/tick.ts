@@ -3,7 +3,7 @@ import { fetchJob, fetchSimilar, detectAdapter } from "@jobtracker/core";
 import { fetchHtmlWithBrowser, shutdownBrowser } from "./browser.js";
 import { fetchHtmlWithScrapy } from "./scrapy.js";
 import { formatInbox } from "./digest.js";
-import { iMessage, macNotify } from "./notify.js";
+import { iMessage, notify } from "./notify.js";
 import { loadConfig } from "./config.js";
 import { runParseStep } from "./parse-step.js";
 import { writeLastTick } from "./state.js";
@@ -78,7 +78,7 @@ async function runTick() {
   if (!formatted) return;
 
   console.log(`[tick] delivering ${inbox.notifications.length} notifications`);
-  await macNotify(formatted.short.title, formatted.short.body);
+  await notify(formatted.short.title, formatted.short.body);
   let via: "macos_notification" | "imessage" = "macos_notification";
   if (iMessageTo) {
     const r = await iMessage(formatted.full, iMessageTo);
