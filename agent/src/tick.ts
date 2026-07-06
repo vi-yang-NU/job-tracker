@@ -1,6 +1,7 @@
 import { Api, type RemoteJob } from "./api.js";
 import { fetchJob, fetchSimilar, detectAdapter } from "@jobtracker/core";
 import { fetchHtmlWithBrowser, shutdownBrowser } from "./browser.js";
+import { fetchHtmlWithScrapy } from "./scrapy.js";
 import { formatInbox } from "./digest.js";
 import { iMessage, macNotify } from "./notify.js";
 import { loadConfig } from "./config.js";
@@ -32,13 +33,14 @@ async function runTick() {
     const adapter = detectAdapter(job.canonicalUrl);
     const useBrowser = !!adapter.needsBrowser;
     try {
+      const fetchHtml = useBrowser ? (u: string) => fetchHtmlWithBrowser(u) : fetchHtmlWithScrapy;
       const fetched = await fetchJob(job.canonicalUrl, {
-        fetchHtml: useBrowser ? (u) => fetchHtmlWithBrowser(u) : undefined,
+        fetchHtml,
       });
       let similar: Array<{ url: string; site: string; title?: string }> = [];
       if (fetched.ok && fetched.job?.available) {
         similar = await fetchSimilar(job.canonicalUrl, {
-          fetchHtml: useBrowser ? (u) => fetchHtmlWithBrowser(u) : undefined,
+          fetchHtml,
         });
       }
       results.push(serialize(job, fetched, similar));

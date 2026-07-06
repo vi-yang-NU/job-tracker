@@ -15,7 +15,8 @@ A multi-tenant job tracker. Hosted dashboard on Vercel; an optional Mac agent ru
      ┌────────────────────────────────────────────────┐
      │ agent/  (Mac CLI, runs via launchd every 3h)   │
      │  • Pulls user's tracked URLs                   │
-     │  • Playwright for LinkedIn / Workday           │
+   │  • Scrapy for fast non-browser HTML fetches    │
+   │  • Playwright for LinkedIn / Workday           │
      │  • Posts results, drains inbox, acks           │
      │  • Silent when nothing changed                 │
      └────────────────────────────────────────────────┘
@@ -47,6 +48,7 @@ Use this for cohorted programs (internships, fellowships, returnships) that have
 | --- | --- |
 | `src/`, `next.config.mjs`, `package.json` | Next.js 15 app at the repo root — deploys to Vercel with zero dashboard config |
 | `agent/` | Node CLI that users install on their Mac |
+| `scraper/` | Optional Scrapy sidecar for HTML fetching |
 | `packages/db/` | Drizzle schema + libSQL client |
 | `packages/core/` | Site adapters + shared fetch helpers |
 
@@ -66,6 +68,10 @@ Use this for cohorted programs (internships, fellowships, returnships) that have
    cp .env.example .env.local              # fill in values
    TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... npm run db:push
    npm run dev
+   ```
+   If you want the Scrapy fetch path in the Mac agent, install the Python dependency once:
+   ```bash
+   python -m pip install -r scraper/requirements.txt
    ```
 5. **Deploy to Vercel:** Import the GitHub repo in Vercel — it auto-detects Next.js at the repo root, no Root Directory override needed. Then set env vars in **Settings → Environment Variables**:
    - `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
@@ -123,7 +129,7 @@ Anything that supports `format: "json"` works — `gemma2:2b`, `qwen2.5:7b`, etc
 
 1. Sign in with Google.
 2. Create a portfolio (e.g., "NYC startups", "2027 internships").
-3. Paste job URLs. The web fetches what it can statically (Greenhouse / Lever / Ashby / generic JSON-LD).
+3. Paste job URLs. The web fetches what it can statically (Greenhouse / Lever / Ashby / generic JSON-LD). The Mac agent uses Scrapy for faster, more resilient non-browser fetching, and still falls back to Playwright for JS-heavy sites.
 4. Optionally set status + target apply date per job.
 5. **Optional Mac agent** — open `/agent` on the deployed site, mint a token, run:
    ```bash

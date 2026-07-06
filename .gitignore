@@ -12,6 +12,8 @@ build/
 coverage/
 playwright-report/
 .cache/
+__pycache__/
+*.pyc
 agent/local.db
 agent/.token
 
